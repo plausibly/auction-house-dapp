@@ -2,8 +2,8 @@
 
 pragma solidity >=0.4.22 <0.9.0;
 
-import "contracts/AuctionHouse_Coin.sol";
-import "contracts/AuctionHouse_Item.sol";
+import "contracts/AuctionHouseCoin.sol";
+import "contracts/AuctionHouseItem.sol";
 
 /// @title Auction House
 /// @author plausibly
@@ -13,11 +13,11 @@ contract AuctionHouse {
     uint private fee;
     uint private collectedFees;
 
-    AuctionHouseCoin coin;
-    AuctionHouseItem nfts;
+    AuctionHouseCoin private coin;
+    AuctionHouseItem private nfts;
 
     mapping (address => bool) private managers; // indicates whether an address is a manager (or admin)
-    mapping (uint256 => AuctionItem) auctions; // maps tokenId to the auction item (if the auction exists)
+    mapping (uint256 => AuctionItem) private auctions; // maps tokenId to the auction item (if the auction exists)
 
     uint256[] runningAuctions;
    
@@ -34,6 +34,7 @@ contract AuctionHouse {
         managers[admin] = true;
         fee = uint(25) / 1000;
         coin = new AuctionHouseCoin();
+        nfts = new AuctionHouseItem();
     }
 
 // todo add emits later
@@ -61,6 +62,10 @@ contract AuctionHouse {
 
     function getItemsOwned() public view returns (uint) {
         return nfts.balanceOf(msg.sender);
+    }
+
+    function isManager(address addr) public view returns (bool) {
+        return managers[addr];
     }
 
     function getCurrentFee() public view returns (uint) {
@@ -161,41 +166,41 @@ contract AuctionHouse {
 
     /* Admin Only */
 
-    function changeAdmin(address newAdmin) private {
-        require(msg.sender == admin, "Insufficient permission. You are not an admin.");
+    function setAdmin(address newAdmin) public {
+        require(msg.sender == admin, "Insufficient permissions");
         managers[msg.sender] = false;
         admin = newAdmin;
         // an admin can be a manager
         managers[admin] = true;
     }
 
-    function addManager(address addr) private {
-        require(msg.sender == admin);
-        managers[addr] = true;
+    function addManager(address addr) public {
+        require(msg.sender == admin, "Insufficient permissions");
+        managers[addr] = true; 
     }
 
-    function removeManager(address addr) private {
-        require(msg.sender == admin);
+    function removeManager(address addr) public {
+        require(msg.sender == admin, "Insufficient permissions");
         managers[addr] = false;
     }
 
     /* Admin or Manager */
 
     function getFeesCollected() public view returns (uint) {
-        require(managers[msg.sender], "Insufficient permissions.");
+        require(managers[msg.sender], "Insufficient permissions");
         return collectedFees;
     }
 
     function withdrawFees() public {
-        require(managers[msg.sender], "Insufficient permissions.");
+        require(managers[msg.sender], "Insufficient permissions");
         uint toWithdraw = getFeesCollected();
         require(toWithdraw > 0, "Empty balance. Nothing to withdraw");
         collectedFees = 0;
         coin.transferFrom(address(this), admin, toWithdraw);
     }
 
-    function changeFee(uint _fee) public {
-        require(managers[msg.sender], "Insufficient permissions.");
+    function setFee(uint _fee) public {
+        require(managers[msg.sender], "Insufficient permissions");
         fee = _fee;
         emit FeeChanged(fee);
     }

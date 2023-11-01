@@ -7,7 +7,7 @@ import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 contract AuctionHouseItem is ERC721, ERC721URIStorage {
     uint256 private _nextTokenId;
 
-    constructor(address initialOwner)
+    constructor()
         ERC721("AuctionHouseItem", "AUCItem")
     {}
 
