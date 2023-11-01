@@ -12,10 +12,11 @@ contract AuctionHouseItem is ERC721, ERC721URIStorage {
     {}
 
     /// Mint an auction house item for the sender.
-    function safeMint(string memory uri) public {
+    function safeMint(string memory uri) public returns (uint256){
         uint256 tokenId = _nextTokenId++;
         _safeMint(msg.sender, tokenId);
         _setTokenURI(tokenId, uri);
+        return tokenId;
     }
 
     function tokenURI(uint256 tokenId) public view override(ERC721, ERC721URIStorage) returns (string memory) {

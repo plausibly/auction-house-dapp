@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 /// @title 
 /// @author 
+/// @notice 
 contract AuctionHouseCoin is ERC20 {
 
     constructor() ERC20("AuctionHouseCoin", "AUC") {

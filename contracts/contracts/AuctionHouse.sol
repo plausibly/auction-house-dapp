@@ -4,7 +4,6 @@ pragma solidity >=0.4.22 <0.9.0;
 
 import "contracts/AuctionHouse_Coin.sol";
 import "contracts/AuctionHouse_Item.sol";
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
 /// @title Auction House
 /// @author plausibly
@@ -17,9 +16,8 @@ contract AuctionHouse {
     AuctionHouseCoin coin;
     AuctionHouseItem nfts;
 
-    mapping (address => bool) private managers; // true if the address is a manager (OR the admin address)
-    mapping (address => uint) private balance;
-    mapping (uint256 => AuctionItem) auctions;
+    mapping (address => bool) private managers; // indicates whether an address is a manager (or admin)
+    mapping (uint256 => AuctionItem) auctions; // maps tokenId to the auction item (if the auction exists)
 
     uint256[] runningAuctions;
    
@@ -34,7 +32,7 @@ contract AuctionHouse {
     constructor() {
         admin = msg.sender;
         managers[admin] = true;
-        fee = SafeMath.div(25, 1000); // 2.5%
+        fee = uint(25) / 1000;
         coin = new AuctionHouseCoin();
     }
 
@@ -63,6 +61,14 @@ contract AuctionHouse {
 
     function getItemsOwned() public view returns (uint) {
         return nfts.balanceOf(msg.sender);
+    }
+
+    function getCurrentFee() public view returns (uint) {
+        return fee;
+    }
+
+    function getAdminAddress() public view returns (address) {
+        return admin;
     }
 
     function claimItems(uint256 tokenId) public {
@@ -125,11 +131,11 @@ contract AuctionHouse {
         require(item.seller == msg.sender, "You are not the seller");
         require(item.highestBidder != address(0), "No bids have been placed to complete this auction.");
 
-        uint houseCut = SafeMath.mul(fee, item.highestBid);
-        collectedFees = SafeMath.add(collectedFees, houseCut);
+        uint houseCut = fee * item.highestBid;
+        collectedFees += houseCut;
         // todo use safe transfer from???
         nfts.transferFrom(address(this), item.highestBidder, item.tokenId);
-        coin.transferFrom(address(this), item.seller, SafeMath.sub(item.highestBid, houseCut));
+        coin.transferFrom(address(this), item.seller, item.highestBid - houseCut);
         delete(auctions[item.tokenId]);
 
         // TODO if time -> emit claim, else emit auctionended
