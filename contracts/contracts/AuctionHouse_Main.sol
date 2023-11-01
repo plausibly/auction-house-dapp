@@ -6,9 +6,8 @@ import "contracts/AuctionHouse_Coin.sol";
 import "contracts/AuctionHouse_Item.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
-/**
-
-*/
+/// @title Auction House
+/// @author plausibly
 contract AuctionHouse {
     address private admin;
     
@@ -43,8 +42,8 @@ contract AuctionHouse {
     event AuctionCreated(uint256 id);
     event AuctionCancelled(uint256 id);
     event AuctionEnded(uint256 id, bool forced);
-    event BidPlaced(uint256 tokenId, uint256 oldBid, uint256 newBid);
-    // event ItemClaimed(string message);
+    event BidPlaced(uint256 tokenId, uint256 newBid);
+    event ItemClaimed(uint256 tokenId);
     event FeeChanged(uint fee);
     event PriceLowered(string message);
 
@@ -56,6 +55,23 @@ contract AuctionHouse {
 
     function mintCoins(uint amnt) public {
         coin.mintToken(amnt);
+    }
+
+    function getTokenBalance() public view returns (uint) {
+        return coin.balanceOf(msg.sender);
+    }
+
+    function getItemsOwned() public view returns (uint) {
+        return nfts.balanceOf(msg.sender);
+    }
+
+    function claimItems(uint256 tokenId) public {
+        AuctionItem memory item = auctions[tokenId];
+        require(item.tokenId != 0, "Auction does not exist");
+        require(item.highestBidder != address(0), "No one bid on the item. There is nothing to claim");
+        //TODO time validate
+        //TODO handle expired auction no bids
+        transferAndCompleteAuction(item);
     }
     
     /* Auction Control (Selling) */
@@ -71,17 +87,19 @@ contract AuctionHouse {
     }
 
     function lowerPrice(uint256 tokenId, uint newPrice) public {
-        AuctionItem storage item = auctions[tokenId];
+        AuctionItem memory item = auctions[tokenId];
+    
         require(item.tokenId != 0, "Auction does not exist");
         require(item.seller == msg.sender, "You are not the seller");
         require(newPrice > 0, "Price must be greater than 0");
         require(item.highestBidder == address(0), "Cannot lower price once bids have started");
         require(newPrice < item.highestBid, "New starting price must be lower than current price");
-        item.highestBid = newPrice; // TODO check if PBR
+    
+        auctions[tokenId].highestBid = newPrice;
     }
 
     function cancelAuction(uint256 tokenId) public {
-        AuctionItem storage item = auctions[tokenId];
+        AuctionItem memory item = auctions[tokenId];
         require(item.tokenId != 0, "Auction does not exist");
         require(item.seller == msg.sender, "You are not the seller");
         // TODO END TIME VALIDATION. HOW!!
@@ -93,18 +111,46 @@ contract AuctionHouse {
     }
 
     function forceEndAuction(uint256 tokenId) public {
-        AuctionItem storage item = auctions[tokenId];
+        AuctionItem memory item = auctions[tokenId];
         require(item.tokenId != 0, "Auction does not exist");
         require(item.seller == msg.sender, "You are not the seller");
         require(item.highestBidder != address(0), "No bids have been placed, cannot end. You may cancel the auction instead");
         // TODO END TIME VALIDATION. HOW!!
+        transferAndCompleteAuction(item);
+    }
+
+    function transferAndCompleteAuction(AuctionItem memory item) private {
+        require(item.tokenId != 0, "Auction does not exist");
+        // this can be called by anyone if an auction has already ended, or if the seller is forcing an end
+        require(item.seller == msg.sender, "You are not the seller");
+        require(item.highestBidder != address(0), "No bids have been placed to complete this auction.");
 
         uint houseCut = SafeMath.mul(fee, item.highestBid);
         collectedFees = SafeMath.add(collectedFees, houseCut);
+        // todo use safe transfer from???
         nfts.transferFrom(address(this), item.highestBidder, item.tokenId);
         coin.transferFrom(address(this), item.seller, SafeMath.sub(item.highestBid, houseCut));
-        delete(auctions[tokenId]);
-        emit AuctionEnded(tokenId, true);
+        delete(auctions[item.tokenId]);
+
+        // TODO if time -> emit claim, else emit auctionended
+    }
+
+    /* Bidding */
+
+    function placeBid(uint256 tokenId, uint bidAmnt) public {
+        require(coin.balanceOf(msg.sender) >= bidAmnt, "You do not have enough AUC to place this bid");
+        AuctionItem memory item = auctions[tokenId];
+        require(item.tokenId != 0, "Auction does not exist");
+        // if there is no bidder, it is ok to match the highest price (since it is the starting price)
+        require(bidAmnt > item.highestBid || (item.highestBidder == address(0x0) && bidAmnt >= item.highestBid), "Bid is too low");
+        if (item.highestBidder != address(0x0)) {
+            // refund the previous (highest) bid
+            coin.transferFrom(address(this), item.highestBidder, item.highestBid);
+        }
+        coin.transferFrom(msg.sender, address(this), bidAmnt);
+        item.highestBidder = msg.sender;
+        item.highestBid = bidAmnt;
+        emit BidPlaced(tokenId, bidAmnt);
     }
 
     /* Admin Only */
@@ -129,29 +175,22 @@ contract AuctionHouse {
 
     /* Admin or Manager */
 
-    function getAdminBalance() public view returns (uint) {
+    function getFeesCollected() public view returns (uint) {
         require(managers[msg.sender], "Insufficient permissions.");
         return collectedFees;
     }
 
-    function withdrawFees() private {
+    function withdrawFees() public {
         require(managers[msg.sender], "Insufficient permissions.");
-        uint toWithdraw = getAdminBalance();
+        uint toWithdraw = getFeesCollected();
         require(toWithdraw > 0, "Empty balance. Nothing to withdraw");
         collectedFees = 0;
         coin.transferFrom(address(this), admin, toWithdraw);
     }
 
-    function changeFee(uint _fee) private {
+    function changeFee(uint _fee) public {
         require(managers[msg.sender], "Insufficient permissions.");
         fee = _fee;
         emit FeeChanged(fee);
     }
-
-    /* Getters */
-
-    function getTokenBalance() public view returns (uint) {
-        return coin.balanceOf(msg.sender);
-    }
-
 }
