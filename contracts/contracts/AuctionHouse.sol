@@ -18,8 +18,6 @@ contract AuctionHouse {
 
     mapping (address => bool) private managers; // indicates whether an address is a manager (or admin)
     mapping (uint256 => AuctionItem) private auctions; // maps tokenId to the auction item (if the auction exists)
-
-    uint256[] runningAuctions;
    
     struct AuctionItem {
         address seller;
@@ -67,8 +65,12 @@ contract AuctionHouse {
         return coin.balanceOf(msg.sender);
     }
 
-    function getItemsOwned() public view returns (uint) {
+    function getNumberOfItems() public view returns (uint) {
         return nfts.balanceOf(msg.sender);
+    }
+
+    function getItemMetadata(uint256 tokenid) public view returns (string memory uri) {
+        return nfts.tokenURI(tokenid);
     }
 
     /// Checks if the address is a manager.
