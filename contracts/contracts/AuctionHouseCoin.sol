@@ -12,9 +12,8 @@ contract AuctionHouseCoin is ERC20 {
         _mint(msg.sender, 0);
     }
 
-    function mintToken(uint amnt) public {
+    function mintToken(address addr, uint amnt) public {
         require(amnt > 0, "Cannot mint <= 0");
-        _mint(msg.sender, amnt);
+        _mint(addr, amnt);
     }
-
 }

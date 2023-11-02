@@ -1,31 +1,24 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import { AuctionHouse } from "../typechain-types";
-import { AuctionHouseCoin } from "../typechain-types/contracts";
-import { AuctionHouseItem } from "../typechain-types/contracts/AuctionHouse_Item.sol";
 
 const permError = "Insufficient permissions";
 
 describe("Auction House", () => {
     let house: AuctionHouse;
-    let coin: AuctionHouseCoin;
-    let nfts: AuctionHouseItem;
 
     beforeEach("Should deploy auction house", async () => {
         // each test runs in isolation, deploy the contract for each one
         house = await ethers.deployContract("AuctionHouse");
-        coin = await ethers.deployContract("AuctionHouseCoin");
-        nfts = await ethers.deployContract("AuctionHouseItem");
     });
 
-    it("Should have default admin address, and all balances are 0", async () => {
+    it("Should setup defaults properly", async () => {
         const [admin] = await ethers.getSigners();
-        
         expect(await house.getAdminAddress()).to.equal(await admin.getAddress());
         expect(await house.getFeesCollected()).to.equal(0);
         expect(await house.getItemsOwned()).to.equal(0);
         expect(await house.getTokenBalance()).to.equal(0);
-        // TODO fee, how?
+        expect(await house.getCurrentFee()).to.equal(250);
     })
 
     it("Admin can change admin", async () => {
@@ -82,6 +75,18 @@ describe("Auction House", () => {
 
     });
 
+    it("Fee is bounded within 0 and 10,000 basis points", async () => {
+        expect(await house.setFee(0)).to.not.be.revertedWith(permError);
+        expect(await house.getCurrentFee()).to.be.equal(0);
+        expect(await house.setFee(10000)).to.not.be.revertedWith(permError);
+        expect(await house.getCurrentFee()).to.be.equal(10000);
+
+        await expect(house.setFee(10001)).to.be.revertedWith("Fee must be positive and cannot exceed 10,000 BP");
+        // uint rejection
+        await expect(house.setFee(-1)).to.be.eventually.rejectedWith(TypeError);
+        expect(await house.getCurrentFee()).to.be.equal(10000);
+    });
+
     it("Non-admins cannot access admin-only functions", async () => {
         const [admin, addr, addr2] = await ethers.getSigners();
         const [manager, user] = [house.connect(addr), house.connect(addr2)];
@@ -101,19 +106,19 @@ describe("Auction House", () => {
         await expect(user.setAdmin(addrToTest)).to.be.revertedWith(permError);
     });
     
-    it("Should mint coins", async () => {
+    it("Should mint coins and view balance", async () => {
         const [admin, addr, addr2] = await ethers.getSigners();
-        const house = await ethers.deployContract("AuctionHouse");
         const senderAddr1 = house.connect(addr);
         const senderAddr2 = house.connect(addr2);
 
-        expect(await senderAddr1.getTokenBalance()).to.equal(0);
+        expect(await house.getTokenBalance()).to.equal(0);
         expect(await senderAddr1.getTokenBalance()).to.equal(0);
         expect(await senderAddr2.getTokenBalance()).to.equal(0);
-        await senderAddr2.mintCoins(BigInt(1000));
+        await senderAddr1.mintCoins(BigInt(1000));
         await house.mintCoins(BigInt(500));
         expect(await senderAddr1.getTokenBalance()).to.equal(1000);
-        expect(await senderAddr2.getTokenBalance()).to.equal(500);
+        expect(await house.getTokenBalance()).to.equal(500);
+        expect(await senderAddr2.getTokenBalance()).to.equal(0);
     });
 
     // it("Should mint items", async () => {

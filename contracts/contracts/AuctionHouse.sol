@@ -10,7 +10,7 @@ import "contracts/AuctionHouseItem.sol";
 contract AuctionHouse {
     address private admin;
     
-    uint private fee;
+    uint private feeBp; // Fee in basis points. Must divide by 10k when using operations
     uint private collectedFees;
 
     AuctionHouseCoin private coin;
@@ -32,7 +32,7 @@ contract AuctionHouse {
     constructor() {
         admin = msg.sender;
         managers[admin] = true;
-        fee = uint(25) / 1000;
+        feeBp = 250;
         coin = new AuctionHouseCoin();
         nfts = new AuctionHouseItem();
     }
@@ -48,14 +48,21 @@ contract AuctionHouse {
 
     /* General Use */
     
+    /// Mint an NFT and sets the sender as the owner
+    /// @param uri data for nft
     function createItem(string memory uri) public returns (uint256) {
-        return nfts.safeMint(uri);
+        // todo how to check URI?
+        return nfts.safeMint(msg.sender, uri);
     }
 
-    function mintCoins(uint amnt) public {
-        coin.mintToken(amnt);
+    /// Mints amt / 10^18 AUC for the sender
+    /// @param amt amount to mint
+    function mintCoins(uint amt) public {
+        coin.mintToken(msg.sender, amt);
     }
 
+    /// Returns the AUC balance of the sender. This should be formatted
+    /// to 18 decimal places.
     function getTokenBalance() public view returns (uint) {
         return coin.balanceOf(msg.sender);
     }
@@ -64,14 +71,18 @@ contract AuctionHouse {
         return nfts.balanceOf(msg.sender);
     }
 
+    /// Checks if the address is a manager.
+    /// @param addr Address to check
     function isManager(address addr) public view returns (bool) {
         return managers[addr];
     }
 
+    /// Gets the current house fee in basis points
     function getCurrentFee() public view returns (uint) {
-        return fee;
+        return feeBp;
     }
 
+    /// Gets the admin address that will eventually consume the fees
     function getAdminAddress() public view returns (address) {
         return admin;
     }
@@ -136,11 +147,15 @@ contract AuctionHouse {
         require(item.seller == msg.sender, "You are not the seller");
         require(item.highestBidder != address(0), "No bids have been placed to complete this auction.");
 
-        uint houseCut = fee * item.highestBid;
+        uint houseCut = item.highestBid * (feeBp / 10000);
+        uint sellerCut = item.highestBid - houseCut;
         collectedFees += houseCut;
-        // todo use safe transfer from???
         nfts.transferFrom(address(this), item.highestBidder, item.tokenId);
-        coin.transferFrom(address(this), item.seller, item.highestBid - houseCut);
+        if (sellerCut > 0) {
+            // the house could theoretically have 100% fee
+            coin.transferFrom(address(this), item.seller, sellerCut);
+        }
+
         delete(auctions[item.tokenId]);
 
         // TODO if time -> emit claim, else emit auctionended
@@ -166,6 +181,8 @@ contract AuctionHouse {
 
     /* Admin Only */
 
+    /// Replaces the admin address with a new one.
+    /// @param newAdmin The address to set as admin
     function setAdmin(address newAdmin) public {
         require(msg.sender == admin, "Insufficient permissions");
         managers[msg.sender] = false;
@@ -174,11 +191,15 @@ contract AuctionHouse {
         managers[admin] = true;
     }
 
+    /// Adds a new manager
+    /// @param addr Address to become manager
     function addManager(address addr) public {
         require(msg.sender == admin, "Insufficient permissions");
         managers[addr] = true; 
     }
 
+    /// Removes a manager.
+    /// @param addr Address to become manager
     function removeManager(address addr) public {
         require(msg.sender == admin, "Insufficient permissions");
         managers[addr] = false;
@@ -186,11 +207,13 @@ contract AuctionHouse {
 
     /* Admin or Manager */
 
+    /// Gets the total fees collected by the house that has yet to be withdrawn
     function getFeesCollected() public view returns (uint) {
         require(managers[msg.sender], "Insufficient permissions");
         return collectedFees;
     }
 
+    /// Withdraws the collected fees into the admin address
     function withdrawFees() public {
         require(managers[msg.sender], "Insufficient permissions");
         uint toWithdraw = getFeesCollected();
@@ -199,9 +222,12 @@ contract AuctionHouse {
         coin.transferFrom(address(this), admin, toWithdraw);
     }
 
+    /// Changes the house fee
+    /// @param _fee Fee in basis points (where 1% = 0.01 * 10,000 BP)
     function setFee(uint _fee) public {
         require(managers[msg.sender], "Insufficient permissions");
-        fee = _fee;
-        emit FeeChanged(fee);
+        require(_fee >= 0 && _fee <= 10000, "Fee must be positive and cannot exceed 10,000 BP");
+        feeBp = _fee;
+        emit FeeChanged(feeBp);
     }
 }

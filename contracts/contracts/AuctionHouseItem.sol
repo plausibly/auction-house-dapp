@@ -7,14 +7,14 @@ import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 contract AuctionHouseItem is ERC721, ERC721URIStorage {
     uint256 private _nextTokenId;
 
-    constructor()
-        ERC721("AuctionHouseItem", "AUCItem")
-    {}
+    constructor() ERC721("AuctionHouseItem", "AUCItem") {}
 
-    /// Mint an auction house item for the sender.
-    function safeMint(string memory uri) public returns (uint256){
+    /// Mint an auction item for owner.
+    /// @param owner owner of the NFT
+    /// @param uri data for the nft
+    function safeMint(address owner, string memory uri) public returns (uint256){
         uint256 tokenId = _nextTokenId++;
-        _safeMint(msg.sender, tokenId);
+        _safeMint(owner, tokenId);
         _setTokenURI(tokenId, uri);
         return tokenId;
     }
