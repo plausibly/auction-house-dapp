@@ -48,7 +48,7 @@ contract AuctionHouse {
     
     /// Mint an NFT and sets the sender as the owner
     /// @param uri data for nft
-    function createItem(string memory uri) public returns (uint256) {
+    function mintItem(string memory uri) public returns (uint256) {
         // todo how to check URI?
         return nfts.safeMint(msg.sender, uri);
     }
@@ -91,7 +91,7 @@ contract AuctionHouse {
 
     function claimItems(uint256 tokenId) public {
         AuctionItem memory item = auctions[tokenId];
-        require(item.tokenId != 0, "Auction does not exist");
+        require(item.endTime != 0, "Auction does not exist");
         require(item.highestBidder != address(0), "No one bid on the item. There is nothing to claim");
         //TODO time validate
         //TODO handle expired auction no bids
@@ -113,7 +113,7 @@ contract AuctionHouse {
     function lowerPrice(uint256 tokenId, uint newPrice) public {
         AuctionItem memory item = auctions[tokenId];
     
-        require(item.tokenId != 0, "Auction does not exist");
+        require(item.endTime != 0, "Auction does not exist");
         require(item.seller == msg.sender, "You are not the seller");
         require(newPrice > 0, "Price must be greater than 0");
         require(item.highestBidder == address(0), "Cannot lower price once bids have started");
@@ -124,7 +124,7 @@ contract AuctionHouse {
 
     function cancelAuction(uint256 tokenId) public {
         AuctionItem memory item = auctions[tokenId];
-        require(item.tokenId != 0, "Auction does not exist");
+        require(item.endTime != 0, "Auction does not exist");
         require(item.seller == msg.sender, "You are not the seller");
         // TODO END TIME VALIDATION. HOW!!
         
@@ -136,7 +136,7 @@ contract AuctionHouse {
 
     function forceEndAuction(uint256 tokenId) public {
         AuctionItem memory item = auctions[tokenId];
-        require(item.tokenId != 0, "Auction does not exist");
+        require(item.endTime != 0, "Auction does not exist");
         require(item.seller == msg.sender, "You are not the seller");
         require(item.highestBidder != address(0), "No bids have been placed, cannot end. You may cancel the auction instead");
         // TODO END TIME VALIDATION. HOW!!
@@ -144,7 +144,7 @@ contract AuctionHouse {
     }
 
     function transferAndCompleteAuction(AuctionItem memory item) private {
-        require(item.tokenId != 0, "Auction does not exist");
+        require(item.endTime != 0, "Auction does not exist");
         // this can be called by anyone if an auction has already ended, or if the seller is forcing an end
         require(item.seller == msg.sender, "You are not the seller");
         require(item.highestBidder != address(0), "No bids have been placed to complete this auction.");
@@ -168,7 +168,7 @@ contract AuctionHouse {
     function placeBid(uint256 tokenId, uint bidAmnt) public {
         require(coin.balanceOf(msg.sender) >= bidAmnt, "You do not have enough AUC to place this bid");
         AuctionItem memory item = auctions[tokenId];
-        require(item.tokenId != 0, "Auction does not exist");
+        require(item.endTime != 0, "Auction does not exist");
         // if there is no bidder, it is ok to match the highest price (since it is the starting price)
         require(bidAmnt > item.highestBid || (item.highestBidder == address(0x0) && bidAmnt >= item.highestBid), "Bid is too low");
         if (item.highestBidder != address(0x0)) {

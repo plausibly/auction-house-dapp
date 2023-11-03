@@ -4,7 +4,7 @@ import { AuctionHouse } from "../typechain-types";
 
 const permError = "Insufficient permissions";
 
-describe("Auction House", () => {
+describe("General Tests", () => {
     let house: AuctionHouse;
 
     beforeEach("Should deploy auction house", async () => {
@@ -16,7 +16,7 @@ describe("Auction House", () => {
         const [admin] = await ethers.getSigners();
         expect(await house.getAdminAddress()).to.equal(await admin.getAddress());
         expect(await house.getFeesCollected()).to.equal(0);
-        expect(await house.getItemsOwned()).to.equal(0);
+        expect(await house.getNumberOfItems()).to.equal(0);
         expect(await house.getTokenBalance()).to.equal(0);
         expect(await house.getCurrentFee()).to.equal(250);
     })
@@ -106,7 +106,7 @@ describe("Auction House", () => {
         await expect(user.setAdmin(addrToTest)).to.be.revertedWith(permError);
     });
     
-    it("Should mint coins and view balance", async () => {
+    it("Anyone can mint coins and view balance", async () => {
         const [admin, addr, addr2] = await ethers.getSigners();
         const senderAddr1 = house.connect(addr);
         const senderAddr2 = house.connect(addr2);
@@ -121,11 +121,48 @@ describe("Auction House", () => {
         expect(await senderAddr2.getTokenBalance()).to.equal(0);
     });
 
-    // it("Should mint items", async () => {
+    it("Items can be minted", async () => {
+        expect(await house.getNumberOfItems()).to.be.equal(0);
+        const data = "ipfs://bafkreiax7oz6q6xrzum6uwudsdc52d2thhpli762mx6ob2d3n4ld3m7m24";
+        const tokenId = (await house.mintItem(data)).value;
+        expect(tokenId).to.equal(0);
+        const tokenUri = await house.getItemMetadata(tokenId);
+        expect(tokenUri).to.equal(data);
+        expect(await house.getNumberOfItems()).to.be.equal(1);
+    });
+});
 
-    // });
+describe("Auctioning Behaviour", () => {
+    let house: AuctionHouse;
 
-    // it("Should create auction", async () => {
+    before("Deploy auction house and setup data", async () => {
+        // mint some tokens and items for addresses
+        // tests will then verify auctioning behaviour for these items
+        house = await ethers.deployContract("AuctionHouse");
+        const [admin, addr, addr2] = await ethers.getSigners();
+
+        const [user1, user2] = [house.connect(addr), house.connect(addr2)];
+
+        // user 1 has id 0,..,4
+        for (let i = 0; i < 5; i++) {
+            user1.mintItem("");
+        }
+        // user 2 has id 5,..,9
+        for (let i = 0; i < 10; i++) {
+            user2.mintItem("");
+        }
+    });
+
+    it("Should not be able to create auction for invalid items", async () => {
+        const [admin, addr, addr2] = await ethers.getSigners();
+        const user1 = house.connect(addr);
+        await expect(user1.createAuction(6, 1000, 99999)).to.be.revertedWith("Cannot auction item you do not own!");
+        await expect(user1.createAuction(0, 1000, 1)).to.be.revertedWith("End time must be in the future");
+        await expect(user1.createAuction(0, 0, 99999)).to.be.revertedWith("Starting price must be > 0");
+        await expect(user1.createAuction(99999, 1000, 99999)).to.be.reverted;
+    });
+
+    // it("Should be able to auction items owned", async () => {
 
     // });
 
@@ -152,5 +189,4 @@ describe("Auction House", () => {
     // it("Should be able to claim items", async () => {
 
     // });
-
 });
