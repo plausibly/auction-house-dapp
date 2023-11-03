@@ -9,14 +9,17 @@ contract AuctionHouseItem is ERC721, ERC721URIStorage {
 
     constructor() ERC721("AuctionHouseItem", "AUCItem") {}
 
-    /// Mint an auction item for owner.
-    /// @param owner owner of the NFT
+    /// Mint an auction item for sender.
     /// @param uri data for the nft
-    function safeMint(address owner, string memory uri) public returns (uint256){
+    function safeMint(string memory uri) public returns (uint256){
         uint256 tokenId = _nextTokenId++;
-        _safeMint(owner, tokenId);
+        _safeMint(msg.sender, tokenId);
         _setTokenURI(tokenId, uri);
         return tokenId;
+    }
+
+    function myBalance() public view returns (uint256) {
+        return this.balanceOf(msg.sender);
     }
 
     function tokenURI(uint256 tokenId) public view override(ERC721, ERC721URIStorage) returns (string memory) {

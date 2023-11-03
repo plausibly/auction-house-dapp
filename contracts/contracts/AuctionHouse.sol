@@ -23,16 +23,16 @@ contract AuctionHouse is IERC721Receiver {
         address seller;
         uint256 tokenId;
         uint endTime;
-        uint highestBid; // starting price (if no bidder); otherwise its the highest bid
+        uint256 highestBid; // starting price (if no bidder); otherwise its the highest bid
         address highestBidder;
     }
     
-    constructor(address coinAddress) {
+    constructor(uint _fee, AuctionHouseCoin _coin, AuctionHouseItem _nfts) {
         admin = msg.sender;
         managers[admin] = true;
-        feeBp = 250;
-        coin = new AuctionHouseCoin(coinAddress);
-        nfts = new AuctionHouseItem();
+        feeBp = _fee;
+        coin = _coin;
+        nfts = _nfts;
     }
 
 // todo add emits later
@@ -46,37 +46,12 @@ contract AuctionHouse is IERC721Receiver {
 
     /* General Use */
 
-    // function onERC721Received(address operator, address from, uint256 tokenId, bytes calldata data) external returns (bytes4) {
-    //     ; // todo
-    // }
-
-
-    /// Mint an NFT and sets the sender as the owner
-    /// @param uri data for nft
-    // function mintItem(string memory uri) public returns (uint256) {
-    //     // todo how to check URI?
-    //     return nfts.safeMint(msg.sender, uri);
-    // }
-
-    // /// Mints amt / 10^18 AUC for the sender
-    // /// @param amt amount to mint
-    // function mintCoins(uint amt) public {
-    //     coin.mintToken(msg.sender, amt);
-    // }
-
-    // /// Returns the AUC balance of the sender. This should be formatted
-    // /// to 18 decimal places.
-    // function getTokenBalance() public view returns (uint) {
-    //     return coin.balanceOf(msg.sender);
-    // }
-
-    // function getNumberOfItems() public view returns (uint) {
-    //     return nfts.balanceOf(msg.sender);
-    // }
-
-    // function getItemMetadata(uint256 tokenid) public view returns (string memory uri) {
-    //     return nfts.tokenURI(tokenid);
-    // }
+//TODO SECURITY CONSIDERATIONS
+//TODO PLAN
+    /// Required override (TODO auction?)
+    function onERC721Received(address operator, address from, uint256 tokenId, bytes calldata data) external returns (bytes4) { 
+        return bytes4(keccak256("onERC721Received(address,address,uint256,bytes)")); //TODO fix this later
+    }
 
     /// Checks if the address is a manager.
     /// @param addr Address to check
@@ -105,17 +80,17 @@ contract AuctionHouse is IERC721Receiver {
     
     /* Auction Control (Selling) */
 
-    function createAuction(uint256 tokenId, uint startPrice, uint endTime) public {
+    function createAuction(uint256 tokenId, uint256 startPrice, uint endTime) public {
         require(nfts.ownerOf(tokenId) == msg.sender, "Cannot auction item you do not own!");
         require(startPrice > 0, "Starting price must be > 0");
         require(endTime > block.timestamp, "End time must be in the future");
 
-        auctions[tokenId] = AuctionItem(msg.sender, tokenId, endTime, startPrice, address(0));
         nfts.safeTransferFrom(msg.sender, address(this), tokenId);
+        auctions[tokenId] = AuctionItem(msg.sender, tokenId, endTime, startPrice, address(0));
         emit AuctionCreated(tokenId);
     }
 
-    function lowerPrice(uint256 tokenId, uint newPrice) public {
+    function lowerPrice(uint256 tokenId, uint256 newPrice) public {
         AuctionItem memory item = auctions[tokenId];
     
         require(item.endTime != 0, "Auction does not exist");
@@ -170,7 +145,7 @@ contract AuctionHouse is IERC721Receiver {
 
     /* Bidding */
 
-    function placeBid(uint256 tokenId, uint bidAmnt) public {
+    function placeBid(uint256 tokenId, uint256 bidAmnt) public {
         AuctionItem memory item = auctions[tokenId];
         require(item.endTime != 0, "Auction does not exist");
         require(coin.balanceOf(msg.sender) >= bidAmnt, "You do not have enough AUC to place this bid");

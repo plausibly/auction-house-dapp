@@ -1,15 +1,16 @@
 import { ethers } from "hardhat";
 
 async function main() {
-  const house = await ethers.deployContract("AuctionHouse");
-  // const coin = await ethers.deployContract("AuctionHouseCoin");
-  // const item = await ethers.deployContract("AuctionHouseItem");
+  const coinFactory = await ethers.getContractFactory("AuctionHouseCoin");
+  const nftFactory = await ethers.getContractFactory("AuctionHouseItem");
+  const coin = await coinFactory.deploy();
+  const nft  = await nftFactory.deploy();
+  await coin.waitForDeployment();
+  await nft.waitForDeployment();
+  let houseFactory = await ethers.getContractFactory("AuctionHouse");
+  const house = await houseFactory.deploy(250, await coin.getAddress(), await nft.getAddress());
 
-  await house.waitForDeployment();
-  // await coin.waitForDeployment();
-  // await item.waitForDeployment();
-
-  console.log(`Auction House deployed to ${house.target}`);
+  console.log(`Auction House deployed to ${house.target}. AUC coin (ERC-20) deployed to ${coin.target} and the items (ERC-721) are deployed to: ${nft.target}`);
 }
 
 // We recommend this pattern to be able to use async/await everywhere

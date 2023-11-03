@@ -8,12 +8,14 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 /// @notice 
 contract AuctionHouseCoin is ERC20 {
 
-    constructor(address _manager) ERC20("AuctionHouseCoin", "AUC") {
-        _mint(_manager, 0);
+    constructor() ERC20("AuctionHouseCoin", "AUC") { }
+
+    function mintToken(uint amnt) public {
+        require(amnt > 0, "Cannot mint <= 0");
+        _mint(msg.sender, amnt);
     }
 
-    function mintToken(address addr, uint amnt) public {
-        require(amnt > 0, "Cannot mint <= 0");
-        _mint(addr, amnt);
+    function myBalance() public view returns (uint256) {
+        return this.balanceOf(msg.sender);
     }
 }

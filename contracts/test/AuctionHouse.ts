@@ -1,25 +1,37 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
-import { AuctionHouse } from "../typechain-types";
-
+import { AuctionHouse, AuctionHouseCoin, AuctionHouseItem } from "../typechain-types";
+import { AddressLike, ContractRunner } from "ethers";
 const permError = "Insufficient permissions";
 
 describe("General Tests", () => {
     let house: AuctionHouse;
+    let coin: AuctionHouseCoin;
+    let nft: AuctionHouseItem;
 
     beforeEach("Should deploy auction house", async () => {
-        // each test runs in isolation, deploy the contract for each one
-        house = await ethers.deployContract("AuctionHouse");
+        // each test case in isolation, deploy again for each case
+        const coinFactory = await ethers.getContractFactory("AuctionHouseCoin");
+        const nftFactory = await ethers.getContractFactory("AuctionHouseItem");
+        coin = await coinFactory.deploy();
+        nft = await nftFactory.deploy();
+        await coin.waitForDeployment();
+        await nft.waitForDeployment();
+        let houseFactory = await ethers.getContractFactory("AuctionHouse");
+        house = await houseFactory.deploy(250, await coin.getAddress(), await nft.getAddress());
+        await house.waitForDeployment();
     });
 
     it("Should setup defaults properly", async () => {
         const [admin] = await ethers.getSigners();
-        expect(await house.getAdminAddress()).to.equal(await admin.getAddress());
+        const adminAddress = await admin.getAddress();
+        expect(await house.getAdminAddress()).to.equal(adminAddress);
         expect(await house.getFeesCollected()).to.equal(0);
-        expect(await house.getNumberOfItems()).to.equal(0);
-        expect(await house.getTokenBalance()).to.equal(0);
         expect(await house.getCurrentFee()).to.equal(250);
-    })
+        // no initial items, or coins exist 
+        expect(await nft.balanceOf(adminAddress)).to.equal(0);
+        expect(await coin.balanceOf(adminAddress)).to.equal(0);
+    });
 
     it("Admin can change admin", async () => {
         const [old, addr1] = await ethers.getSigners();
@@ -108,71 +120,95 @@ describe("General Tests", () => {
     
     it("Anyone can mint coins and view balance", async () => {
         const [admin, addr, addr2] = await ethers.getSigners();
-        const senderAddr1 = house.connect(addr);
-        const senderAddr2 = house.connect(addr2);
-
-        expect(await house.getTokenBalance()).to.equal(0);
-        expect(await senderAddr1.getTokenBalance()).to.equal(0);
-        expect(await senderAddr2.getTokenBalance()).to.equal(0);
-        await senderAddr1.mintCoins(BigInt(1000));
-        await house.mintCoins(BigInt(500));
-        expect(await senderAddr1.getTokenBalance()).to.equal(1000);
-        expect(await house.getTokenBalance()).to.equal(500);
-        expect(await senderAddr2.getTokenBalance()).to.equal(0);
-    });
-
-    it("Items can be minted", async () => {
-        expect(await house.getNumberOfItems()).to.be.equal(0);
-        const data = "ipfs://bafkreiax7oz6q6xrzum6uwudsdc52d2thhpli762mx6ob2d3n4ld3m7m24";
-        const tokenId = (await house.mintItem(data)).value;
-        expect(tokenId).to.equal(0);
-        const tokenUri = await house.getItemMetadata(tokenId);
-        expect(tokenUri).to.equal(data);
-        expect(await house.getNumberOfItems()).to.be.equal(1);
+        const [adminAddr, uAddr] = [await admin.getAddress(), await addr.getAddress(), await addr2.getAddress()];
+        expect(await coin.balanceOf(adminAddr)).to.equal(0);
+        expect(await coin.balanceOf(uAddr)).to.equal(0);
+        let userSender = coin.connect(addr);
+        await userSender.mintToken(500); // as user
+        await coin.mintToken(100000); // as admin
+        expect(await coin.balanceOf(adminAddr)).to.equal(100000);
+        expect(await coin.balanceOf(uAddr)).to.equal(500);
     });
 });
 
 describe("Auctioning Behaviour", () => {
-    let house: AuctionHouse, user1: AuctionHouse, user2: AuctionHouse, user3: AuctionHouse;
+    let house: AuctionHouse;
+    let coin: AuctionHouseCoin;
+    let nft: AuctionHouseItem;
 
     before("Deploy auction house and setup data", async () => {
         // mint some tokens and items for addresses
+        // approve the house to use auc/items
         // tests will then verify auctioning behaviour for these items
-        house = await ethers.deployContract("AuctionHouse");
-
         const [admin, addr, addr2, addr3] = await ethers.getSigners();
+        
+        // deploy and setup contracts using admin
+        const coinFactory = await ethers.getContractFactory("AuctionHouseCoin");
+        const nftFactory = await ethers.getContractFactory("AuctionHouseItem");
+        coin = await coinFactory.deploy();
+        nft = await nftFactory.deploy();
+        await coin.waitForDeployment();
+        await nft.waitForDeployment();
+        let houseFactory = await ethers.getContractFactory("AuctionHouse");
+        house = await houseFactory.deploy(250, await coin.getAddress(), await nft.getAddress());
+        await house.waitForDeployment();
+        expect(house.getAddress()).to.not.be.equal(await admin.getAddress());
 
-        [user1, user2, user3] = [house.connect(addr), house.connect(addr2), house.connect(addr3)];
+        // different msg.senders
+        const [user1, user2] = [nft.connect(addr), nft.connect(addr2)];
+        const [user1c, user2c, user3c] = [coin.connect(addr), coin.connect(addr2), coin.connect(addr3)];
 
+        // ensure house can move their AUC and items
+        await user1.setApprovalForAll(house.getAddress(), true);
+        await user2.setApprovalForAll(house.getAddress(), true);
+        await user1c.approve(house.getAddress(), 9999999);
+        await user2c.approve(house.getAddress(), 9999999);
+        await user3c.approve(house.getAddress(), 9999999);
+
+        // mint some items to start
         // user 1 has id 0,..,4
         for (let i = 0; i < 5; i++) {
-            user1.mintItem("");
+            await user1.safeMint("");
         }
         // user 2 has id 5,..,9
-        for (let i = 0; i < 10; i++) {
-            user2.mintItem("");
+        for (let i = 0; i < 5; i++) {
+            await user2.safeMint("");
         }
+
+        // verify setup worked
+        expect(await user1.myBalance()).to.equal(5);
+        expect(await user2.myBalance()).to.equal(5);
     });
 
     it("Should not be able to create auction for invalid items", async () => {
+        const [admin, addr] = await ethers.getSigners();
+        const user1 = house.connect(addr);
         await expect(user1.createAuction(6, 1000, 1)).to.be.revertedWith("Cannot auction item you do not own!");
         await expect(user1.createAuction(0, 1000, 1)).to.be.revertedWith("End time must be in the future");
         await expect(user1.createAuction(0, 0, 1)).to.be.revertedWith("Starting price must be > 0");
         await expect(user1.createAuction(99999, 1000, 1)).to.be.reverted;
+        expect(await nft.balanceOf(addr)).to.equal(5);
     });
 
     it("Should be able to auction items owned", async () => {
-        const itemsOwned = (await user1.getNumberOfItems());
-        
-        await expect(user1.createAuction(0, 350, Date.now() + 9999)).to.not.be.reverted;
+        const [admin, addr] = await ethers.getSigners();
+
+        const hUser1 = house.connect(addr);
+        const nftUser1 = nft.connect(addr);
+        const itemsOwned = (await nftUser1.myBalance());
+        await hUser1.createAuction(0, 350, Date.now() + 9999);
 
         // item sent to house, no longer owned by user
-        expect(await user1.getNumberOfItems()).to.be.equal(itemsOwned - BigInt(1));
+        expect(await nftUser1.myBalance()).to.be.equal(itemsOwned - BigInt(1));
+        expect(await nft.balanceOf(house.getAddress())).to.be.equal(BigInt(1));
+
         //todo verify events
     });
 
     it("Should not be able to manipulate auctions that don't exist or arent owned by you", async () => {
+        const [admin, addr, addr2] = await ethers.getSigners();
         // invalid ownership, or non-existant item
+        const user2 = house.connect(addr2);
         await expect(user2.lowerPrice(0, 1)).to.be.reverted;
         await expect(user2.lowerPrice(9999, 1)).to.be.reverted;
         await expect(user2.cancelAuction(0)).to.be.reverted;
@@ -184,35 +220,43 @@ describe("Auctioning Behaviour", () => {
         await expect(user2.lowerPrice(6, 1)).to.be.reverted;
         await expect(user2.cancelAuction(6)).to.be.reverted;
         await expect(user2.forceEndAuction(6)).to.be.reverted;
-        await expect(user2.forceEndAuction(6)).to.be.reverted;    
+        await expect(user2.forceEndAuction(6)).to.be.reverted;
     });
 
     it("Should not be able to make invalid bids", async () => {
+        const [admin, addr, addr2] = await ethers.getSigners();
+
+        const user2 = house.connect(addr2);
+        const user2coin = coin.connect(addr2);
         await expect(user2.placeBid(3, 1)).to.be.revertedWith("Auction does not exist");
         await expect(user2.placeBid(999, 1)).to.be.revertedWith("Auction does not exist");
         await expect(user2.placeBid(0, 1)).to.be.revertedWith("You do not have enough AUC to place this bid");
-        await user2.mintCoins(5 * 10**18);
+        await user2coin.mintToken(BigInt(5 * 10**18));
         await expect(user2.placeBid(0, 1)).to.be.revertedWith("Bid is too low");
     });
 
     it("Should be able to place bids with sufficient AUC", async () => {
-        const mintedAmtUser2 = await user2.getTokenBalance();
-        const bidAmt = BigInt(1 * 1**18);
+        const [admin, addr, addr2, addr3] = await ethers.getSigners();
+        const user2Coin = coin.connect(addr2);
+        const user3Coin = coin.connect(addr3);
+        const user2 = house.connect(addr2);
+        const user3 = house.connect(addr3);
+
+        const mintedAmtUser2 = BigInt(5000);
+        const bidAmt = BigInt(350); // bid the exact starting price
         await expect(user2.placeBid(0, bidAmt)).to.not.be.reverted;
-        expect(await user2.getTokenBalance()).to.be.equal(mintedAmtUser2 - bidAmt);
-
-        //todo cal token to mint, and item to mint not the house 
-        //todo how to call imported contracts and approve
-        const mintedAmtUser3 = 3 * 10**18;
-        await user3.mintCoins(mintedAmtUser3);
-
-        // greater than start price, less than highest bid
-        await expect(user3.placeBid(0, 500)).to.be.rejectedWith("Bid is too low");
-        expect(await user3.getTokenBalance()).to.equal(mintedAmtUser3)
+        expect(await coin.balanceOf(addr2.getAddress())).to.be.equal(BigInt(mintedAmtUser2 - bidAmt));
+        
+        const mintedAmtUser3 = BigInt(60000);
+        await user3Coin.mintToken(mintedAmtUser3)
+        
+        // greater than start price, not higher than highest bid
+        await expect(user3.placeBid(0, bidAmt)).to.be.rejectedWith("Bid is too low");
+        expect(await user3Coin.myBalance()).to.equal(mintedAmtUser3);
         await expect(user3.placeBid(0, mintedAmtUser3)).to.not.be.rejected;
         // refund old bidder, take new higher bid
-        expect(await user3.getTokenBalance()).to.equal(0);
-        expect(await user2.getTokenBalance()).to.equal(mintedAmtUser2);
+        expect(await user3Coin.myBalance()).to.equal(0);
+        expect(await user2Coin.myBalance()).to.equal(mintedAmtUser2);
     });
 
     // it("Should be able to lower auction price", async () => {
