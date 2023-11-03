@@ -7,7 +7,7 @@ import "contracts/AuctionHouseItem.sol";
 
 /// @title Auction House
 /// @author plausibly
-contract AuctionHouse {
+contract AuctionHouse is IERC721Receiver {
     address private admin;
     
     uint private feeBp; // Fee in basis points. Must divide by 10k when using operations
@@ -27,11 +27,11 @@ contract AuctionHouse {
         address highestBidder;
     }
     
-    constructor() {
+    constructor(address coinAddress) {
         admin = msg.sender;
         managers[admin] = true;
         feeBp = 250;
-        coin = new AuctionHouseCoin();
+        coin = new AuctionHouseCoin(coinAddress);
         nfts = new AuctionHouseItem();
     }
 
@@ -45,33 +45,38 @@ contract AuctionHouse {
     event PriceLowered(string message);
 
     /* General Use */
-    
+
+    // function onERC721Received(address operator, address from, uint256 tokenId, bytes calldata data) external returns (bytes4) {
+    //     ; // todo
+    // }
+
+
     /// Mint an NFT and sets the sender as the owner
     /// @param uri data for nft
-    function mintItem(string memory uri) public returns (uint256) {
-        // todo how to check URI?
-        return nfts.safeMint(msg.sender, uri);
-    }
+    // function mintItem(string memory uri) public returns (uint256) {
+    //     // todo how to check URI?
+    //     return nfts.safeMint(msg.sender, uri);
+    // }
 
-    /// Mints amt / 10^18 AUC for the sender
-    /// @param amt amount to mint
-    function mintCoins(uint amt) public {
-        coin.mintToken(msg.sender, amt);
-    }
+    // /// Mints amt / 10^18 AUC for the sender
+    // /// @param amt amount to mint
+    // function mintCoins(uint amt) public {
+    //     coin.mintToken(msg.sender, amt);
+    // }
 
-    /// Returns the AUC balance of the sender. This should be formatted
-    /// to 18 decimal places.
-    function getTokenBalance() public view returns (uint) {
-        return coin.balanceOf(msg.sender);
-    }
+    // /// Returns the AUC balance of the sender. This should be formatted
+    // /// to 18 decimal places.
+    // function getTokenBalance() public view returns (uint) {
+    //     return coin.balanceOf(msg.sender);
+    // }
 
-    function getNumberOfItems() public view returns (uint) {
-        return nfts.balanceOf(msg.sender);
-    }
+    // function getNumberOfItems() public view returns (uint) {
+    //     return nfts.balanceOf(msg.sender);
+    // }
 
-    function getItemMetadata(uint256 tokenid) public view returns (string memory uri) {
-        return nfts.tokenURI(tokenid);
-    }
+    // function getItemMetadata(uint256 tokenid) public view returns (string memory uri) {
+    //     return nfts.tokenURI(tokenid);
+    // }
 
     /// Checks if the address is a manager.
     /// @param addr Address to check
@@ -166,9 +171,9 @@ contract AuctionHouse {
     /* Bidding */
 
     function placeBid(uint256 tokenId, uint bidAmnt) public {
-        require(coin.balanceOf(msg.sender) >= bidAmnt, "You do not have enough AUC to place this bid");
         AuctionItem memory item = auctions[tokenId];
         require(item.endTime != 0, "Auction does not exist");
+        require(coin.balanceOf(msg.sender) >= bidAmnt, "You do not have enough AUC to place this bid");
         // if there is no bidder, it is ok to match the highest price (since it is the starting price)
         require(bidAmnt > item.highestBid || (item.highestBidder == address(0x0) && bidAmnt >= item.highestBid), "Bid is too low");
         if (item.highestBidder != address(0x0)) {

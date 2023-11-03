@@ -8,8 +8,8 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 /// @notice 
 contract AuctionHouseCoin is ERC20 {
 
-    constructor() ERC20("AuctionHouseCoin", "AUC") {
-        _mint(msg.sender, 0);
+    constructor(address _manager) ERC20("AuctionHouseCoin", "AUC") {
+        _mint(_manager, 0);
     }
 
     function mintToken(address addr, uint amnt) public {

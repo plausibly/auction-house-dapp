@@ -133,15 +133,16 @@ describe("General Tests", () => {
 });
 
 describe("Auctioning Behaviour", () => {
-    let house: AuctionHouse;
+    let house: AuctionHouse, user1: AuctionHouse, user2: AuctionHouse, user3: AuctionHouse;
 
     before("Deploy auction house and setup data", async () => {
         // mint some tokens and items for addresses
         // tests will then verify auctioning behaviour for these items
         house = await ethers.deployContract("AuctionHouse");
-        const [admin, addr, addr2] = await ethers.getSigners();
 
-        const [user1, user2] = [house.connect(addr), house.connect(addr2)];
+        const [admin, addr, addr2, addr3] = await ethers.getSigners();
+
+        [user1, user2, user3] = [house.connect(addr), house.connect(addr2), house.connect(addr3)];
 
         // user 1 has id 0,..,4
         for (let i = 0; i < 5; i++) {
@@ -154,31 +155,71 @@ describe("Auctioning Behaviour", () => {
     });
 
     it("Should not be able to create auction for invalid items", async () => {
-        const [admin, addr, addr2] = await ethers.getSigners();
-        const user1 = house.connect(addr);
-        await expect(user1.createAuction(6, 1000, 99999)).to.be.revertedWith("Cannot auction item you do not own!");
+        await expect(user1.createAuction(6, 1000, 1)).to.be.revertedWith("Cannot auction item you do not own!");
         await expect(user1.createAuction(0, 1000, 1)).to.be.revertedWith("End time must be in the future");
-        await expect(user1.createAuction(0, 0, 99999)).to.be.revertedWith("Starting price must be > 0");
-        await expect(user1.createAuction(99999, 1000, 99999)).to.be.reverted;
+        await expect(user1.createAuction(0, 0, 1)).to.be.revertedWith("Starting price must be > 0");
+        await expect(user1.createAuction(99999, 1000, 1)).to.be.reverted;
     });
 
-    // it("Should be able to auction items owned", async () => {
+    it("Should be able to auction items owned", async () => {
+        const itemsOwned = (await user1.getNumberOfItems());
+        
+        await expect(user1.createAuction(0, 350, Date.now() + 9999)).to.not.be.reverted;
 
-    // });
+        // item sent to house, no longer owned by user
+        expect(await user1.getNumberOfItems()).to.be.equal(itemsOwned - BigInt(1));
+        //todo verify events
+    });
 
-    // it("Should not be able to manipulate auctions you do not own", async () => {
+    it("Should not be able to manipulate auctions that don't exist or arent owned by you", async () => {
+        // invalid ownership, or non-existant item
+        await expect(user2.lowerPrice(0, 1)).to.be.reverted;
+        await expect(user2.lowerPrice(9999, 1)).to.be.reverted;
+        await expect(user2.cancelAuction(0)).to.be.reverted;
+        await expect(user2.forceEndAuction(0)).to.be.reverted;
+        await expect(user2.forceEndAuction(0)).to.be.reverted;
 
-    // });
+        // owner of item, but no auction is running
+        await expect(user2.lowerPrice(6, 1)).to.be.reverted;
+        await expect(user2.lowerPrice(6, 1)).to.be.reverted;
+        await expect(user2.cancelAuction(6)).to.be.reverted;
+        await expect(user2.forceEndAuction(6)).to.be.reverted;
+        await expect(user2.forceEndAuction(6)).to.be.reverted;    
+    });
+
+    it("Should not be able to make invalid bids", async () => {
+        await expect(user2.placeBid(3, 1)).to.be.revertedWith("Auction does not exist");
+        await expect(user2.placeBid(999, 1)).to.be.revertedWith("Auction does not exist");
+        await expect(user2.placeBid(0, 1)).to.be.revertedWith("You do not have enough AUC to place this bid");
+        await user2.mintCoins(5 * 10**18);
+        await expect(user2.placeBid(0, 1)).to.be.revertedWith("Bid is too low");
+    });
+
+    it("Should be able to place bids with sufficient AUC", async () => {
+        const mintedAmtUser2 = await user2.getTokenBalance();
+        const bidAmt = BigInt(1 * 1**18);
+        await expect(user2.placeBid(0, bidAmt)).to.not.be.reverted;
+        expect(await user2.getTokenBalance()).to.be.equal(mintedAmtUser2 - bidAmt);
+
+        //todo cal token to mint, and item to mint not the house 
+        //todo how to call imported contracts and approve
+        const mintedAmtUser3 = 3 * 10**18;
+        await user3.mintCoins(mintedAmtUser3);
+
+        // greater than start price, less than highest bid
+        await expect(user3.placeBid(0, 500)).to.be.rejectedWith("Bid is too low");
+        expect(await user3.getTokenBalance()).to.equal(mintedAmtUser3)
+        await expect(user3.placeBid(0, mintedAmtUser3)).to.not.be.rejected;
+        // refund old bidder, take new higher bid
+        expect(await user3.getTokenBalance()).to.equal(0);
+        expect(await user2.getTokenBalance()).to.equal(mintedAmtUser2);
+    });
 
     // it("Should be able to lower auction price", async () => {
-
+    //     await expect(user2.forceEndAuction(999)).to.be.reverted;
     // });
 
     // it("Should be able to cancel auction", async () => {
-
-    // });
-
-    // it("Should be able to place bids", async () => {
 
     // });
 
