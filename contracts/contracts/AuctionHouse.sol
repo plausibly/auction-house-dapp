@@ -69,6 +69,10 @@ contract AuctionHouse is IERC721Receiver {
         return admin;
     }
 
+    function getHighestBidder(uint256 tokenId) public view returns (address) {
+        return auctions[tokenId].highestBidder;
+    }
+
     function claimItems(uint256 tokenId) public {
         AuctionItem memory item = auctions[tokenId];
         require(item.endTime != 0, "Auction does not exist");
@@ -146,12 +150,12 @@ contract AuctionHouse is IERC721Receiver {
     /* Bidding */
 
     function placeBid(uint256 tokenId, uint256 bidAmnt) public {
-        AuctionItem memory item = auctions[tokenId];
+        AuctionItem storage item = auctions[tokenId];
         require(item.endTime != 0, "Auction does not exist");
         require(coin.balanceOf(msg.sender) >= bidAmnt, "You do not have enough AUC to place this bid");
-        // if there is no bidder, it is ok to match the highest price (since it is the starting price)
-        require(bidAmnt > item.highestBid || (item.highestBidder == address(0x0) && bidAmnt >= item.highestBid), "Bid is too low");
-        if (item.highestBidder != address(0x0)) {
+        // if there was a previous bid, the new bid should be strictly greater (otherwise highestBid is the startprice)
+        require(bidAmnt >= item.highestBid || (item.highestBidder != address(0) && bidAmnt > item.highestBid), "Bid is too low");
+        if (item.highestBidder != address(0)) {
             // refund the previous (highest) bid
             coin.transferFrom(address(this), item.highestBidder, item.highestBid);
         }

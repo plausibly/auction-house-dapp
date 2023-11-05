@@ -2,12 +2,13 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 import { AuctionHouse, AuctionHouseCoin, AuctionHouseItem } from "../typechain-types";
 import { AddressLike, ContractRunner } from "ethers";
-const permError = "Insufficient permissions";
 
 describe("General Tests", () => {
     let house: AuctionHouse;
     let coin: AuctionHouseCoin;
     let nft: AuctionHouseItem;
+
+    const permError = "Insufficient permissions";
 
     beforeEach("Should deploy auction house", async () => {
         // each test case in isolation, deploy again for each case
@@ -159,11 +160,12 @@ describe("Auctioning Behaviour", () => {
         const [user1c, user2c, user3c] = [coin.connect(addr), coin.connect(addr2), coin.connect(addr3)];
 
         // ensure house can move their AUC and items
-        await user1.setApprovalForAll(house.getAddress(), true);
-        await user2.setApprovalForAll(house.getAddress(), true);
-        await user1c.approve(house.getAddress(), 9999999);
-        await user2c.approve(house.getAddress(), 9999999);
-        await user3c.approve(house.getAddress(), 9999999);
+        const houseAddress = house.getAddress();
+        await user1.setApprovalForAll(houseAddress, true);
+        await user2.setApprovalForAll(houseAddress, true);
+        await user1c.approve(houseAddress, Number.MAX_SAFE_INTEGER);
+        await user2c.approve(houseAddress, Number.MAX_SAFE_INTEGER);
+        await user3c.approve(houseAddress, Number.MAX_SAFE_INTEGER);
 
         // mint some items to start
         // user 1 has id 0,..,4
@@ -195,8 +197,9 @@ describe("Auctioning Behaviour", () => {
 
         const hUser1 = house.connect(addr);
         const nftUser1 = nft.connect(addr);
-        const itemsOwned = (await nftUser1.myBalance());
-        await hUser1.createAuction(0, 350, Date.now() + 9999);
+        const itemsOwned = await nftUser1.myBalance();
+        const startPrice = BigInt(0.005 * 10**18);
+        await hUser1.createAuction(0, startPrice, Date.now() + 9999);
 
         // item sent to house, no longer owned by user
         expect(await nftUser1.myBalance()).to.be.equal(itemsOwned - BigInt(1));
@@ -242,18 +245,22 @@ describe("Auctioning Behaviour", () => {
         const user2 = house.connect(addr2);
         const user3 = house.connect(addr3);
 
-        const mintedAmtUser2 = BigInt(5000);
-        const bidAmt = BigInt(350); // bid the exact starting price
-        await expect(user2.placeBid(0, bidAmt)).to.not.be.reverted;
+        const mintedAmtUser2 = BigInt(5 * 10**18);
+        const bidAmt = BigInt(0.005 * 10**18); // bid the exact starting price
+        await user2.placeBid(0, bidAmt);
         expect(await coin.balanceOf(addr2.getAddress())).to.be.equal(BigInt(mintedAmtUser2 - bidAmt));
+
+        expect(await house.getHighestBidder(0)).to.equal(await addr2.getAddress());
         
-        const mintedAmtUser3 = BigInt(60000);
+        const mintedAmtUser3 = BigInt(0.005001 * 10**18);
         await user3Coin.mintToken(mintedAmtUser3)
         
-        // greater than start price, not higher than highest bid
+        // match the previous bid (should be rejected)
         await expect(user3.placeBid(0, bidAmt)).to.be.rejectedWith("Bid is too low");
         expect(await user3Coin.myBalance()).to.equal(mintedAmtUser3);
-        await expect(user3.placeBid(0, mintedAmtUser3)).to.not.be.rejected;
+
+        // place larger bid
+        await user3.placeBid(0, mintedAmtUser3);
         // refund old bidder, take new higher bid
         expect(await user3Coin.myBalance()).to.equal(0);
         expect(await user2Coin.myBalance()).to.equal(mintedAmtUser2);
