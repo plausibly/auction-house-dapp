@@ -8,23 +8,35 @@ import Link from "@mui/material/Link";
 import BalanceWallet from "@mui/icons-material/AccountBalanceWallet";
 import { useLoginContext } from "@/contexts/LoginContextProvider";
 import { CoinServiceProvider } from "@/app/services/coin";
+import { HouseServiceProvider } from "@/app/services/house";
 
 export default function Header() {
   const { login, logout, state } = useLoginContext();
-  let coinService: CoinServiceProvider | undefined = undefined;
+  let coinService: CoinServiceProvider | undefined;
+  let houseService: HouseServiceProvider | undefined;
 
   const [auc, setAuc] = useState("0");
 
+  // for show/hiding "Management" tab (admin is also a manager)
+  const [isManager, setManager] = useState(false);
+
   if (state.isLoggedIn && state.provider) {
     coinService = new CoinServiceProvider(state.address, state.provider);
+    houseService = new HouseServiceProvider(state.address, state.provider);
   }
 
   useEffect(() => {
-    if (state.isLoggedIn && coinService) {
-      coinService.getAUC().then(f => setAuc(f.toString()));
+    if (state.isLoggedIn) {
+      if (coinService) {
+        coinService.getAUC().then((f) => setAuc(f.toString()));
+      }
+      if (houseService) {
+        houseService.isManager().then((f) => setManager(f));
+      }
+    } else {
+      setManager(false);
     }
-    
-  }, [state, coinService]);
+  }, [state, coinService, houseService]);
 
   return (
     <AppBar position="static" elevation={0}>
@@ -51,12 +63,16 @@ export default function Header() {
         >
           Auction
         </Link>
-        <Link
-          sx={{ my: 1, mx: 1.5, textDecoration: "none" }}
-          href="/management"
-        >
-          Management
-        </Link>
+        {isManager ? (
+          <Link
+            sx={{ my: 1, mx: 1.5, textDecoration: "none" }}
+            href="/management"
+          >
+            Management
+          </Link>
+        ) : (
+          <></>
+        )}
         {state.isLoggedIn ? (
           <Button
             onClick={logout}

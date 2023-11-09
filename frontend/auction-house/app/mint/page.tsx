@@ -5,6 +5,7 @@ import Typography from "@mui/material/Typography";
 import Header from "../../components/Header";
 import { useLoginContext } from "@/contexts/LoginContextProvider";
 import { CoinServiceProvider } from "../services/coin";
+import { ethers } from "ethers";
 
 export default function Mint() {
   const state = useLoginContext().state;
@@ -126,7 +127,7 @@ export default function Mint() {
             id="standard-basic"
             label="Amount (in AUC)"
             variant="filled"
-            onChange={(e) => setMintAmnt(BigInt(e.target.value))}
+            onChange={(e) => setMintAmnt(ethers.toBigInt(e.target.value))}
           />
           <Button onClick={() => coinService.mintAUC(toMint)} sx={{ ml: 1 }} variant="outlined">
             Mint

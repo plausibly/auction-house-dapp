@@ -1,31 +1,40 @@
 import { JsonRpcSigner, ethers, formatUnits } from "ethers";
 import AuctionHouseCoin from "../../../../contracts/artifacts/contracts/AuctionHouseCoin.sol/AuctionHouseCoin.json";
-import { CoinContract } from "@/contractDetails";
+import { CoinContract } from "@/contract-details";
 
 export class CoinServiceProvider {
-    coinContract: ethers.Contract;
-    coinContractSigned?: ethers.Contract;
+    contract: ethers.Contract;
+    signed?: ethers.Contract;
     address: string;
 
     constructor(address: string, provider: ethers.BrowserProvider, signer?: JsonRpcSigner) {
         this.address = address;
-        this.coinContract = new ethers.Contract(CoinContract, AuctionHouseCoin.abi, provider);
+        this.contract = new ethers.Contract(CoinContract, AuctionHouseCoin.abi, provider);
         if (signer) {
-            this.coinContractSigned = new ethers.Contract(CoinContract, AuctionHouseCoin.abi, signer);
+            this.signed = new ethers.Contract(CoinContract, AuctionHouseCoin.abi, signer);
         }
+    }
+    
+    getContract() {
+        return this.contract;
+    }
+
+    getSigned() {
+        return this.signed;
     }
 
     async getAUC() {
-        const balance = await this.coinContract.balanceOf(this.address);
-        const decimals = await this.coinContract.decimals();
+        const balance = await this.contract.balanceOf(this.address);
+        const decimals = await this.contract.decimals();
         return formatUnits(balance, decimals);
     }
 
-    async mintAUC(amnt: BigInt) {
-        if (!this.coinContractSigned) {
+    async mintAUC(amnt: bigint) {
+        if (!this.signed) {
             return;
         }
-        const decimals = await this.coinContract.decimals();
-        await this.coinContractSigned.mintToken(amnt);
+        const decimals: ethers.BigNumberish = ethers.toBigInt(await this.contract.decimals());
+
+        await this.signed.mintToken(amnt * ethers.toBigInt(10) ** decimals);
     }
 }
