@@ -104,6 +104,7 @@ export default function Mint() {
           <Typography variant="caption">
             If only they had material value.
           </Typography>
+
         </Grid>
         <Grid item alignItems="stretch" style={{ display: "flex" }}>
           <TextField
@@ -114,6 +115,11 @@ export default function Mint() {
           <Button sx={{ ml: 1 }} variant="outlined">
             Mint
           </Button>
+        </Grid>
+        <Grid item xs={12}>
+        <Typography>
+            AUC Balance: 0
+          </Typography>
         </Grid>
       </Grid>
     </div>

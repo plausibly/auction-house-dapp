@@ -7,7 +7,7 @@ import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 contract AuctionHouseItem is ERC721, ERC721URIStorage {
     uint256 private _nextTokenId;
 
-    constructor() ERC721("AuctionHouseItem", "AUCItem") {} //TODO ANY SYMBOL.NAME SHOULD BE ALLOWD
+    constructor(string memory name_, string memory symbol_) ERC721(name_, symbol_) {}//TODO WE DO NOT DEPLOY THIS, THE USER DOES.
 
     /// Mint an auction item for sender.
     /// @param uri data for the nft

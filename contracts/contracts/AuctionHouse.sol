@@ -11,7 +11,7 @@ contract AuctionHouse is IERC721Receiver {
     address private admin;
     
     uint private feeBp; // Fee in basis points. Must divide by 10k when using operations
-    uint private collectedFees;
+    uint256 private collectedFees;
 
     AuctionHouseCoin private coin;
     AuctionHouseItem private nfts;
@@ -21,6 +21,7 @@ contract AuctionHouse is IERC721Receiver {
    
     struct AuctionItem {
         address seller;
+        address contractId;
         uint256 tokenId;
         uint endTime;
         uint256 highestBid; // starting price (if no bidder); otherwise its the highest bid
@@ -200,12 +201,12 @@ contract AuctionHouse is IERC721Receiver {
     }
 
     /// Withdraws the collected fees into the admin address
-    function withdrawFees() public {
+    function withdrawFees(uint256 amnt) public {
         require(managers[msg.sender], "Insufficient permissions");
-        uint toWithdraw = getFeesCollected();
-        require(toWithdraw > 0, "Empty balance. Nothing to withdraw");
-        collectedFees = 0;
-        coin.transferFrom(address(this), admin, toWithdraw);
+        uint256 balance = getFeesCollected();
+        require(amnt >= balance, "Insufficient Balance to withdraw specified amount");
+        collectedFees = balance - amnt;
+        coin.transferFrom(address(this), admin, amnt);
     }
 
     /// Changes the house fee

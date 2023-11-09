@@ -1,4 +1,5 @@
-import React from "react";
+"use client";
+import React, { createContext, useContext } from "react";
 import {
   Button,
   CssBaseline,
@@ -6,9 +7,13 @@ import {
   TextField,
   ThemeProvider,
 } from "@mui/material";
+
 import Typography from "@mui/material/Typography";
 import Header from "../components/Header";
 import createTheme from "@mui/material/styles/createTheme";
+import { LoginState } from "@/components/LoginProvider";
+import { LoginContext } from "@/contexts/LoginContextProvider";
+
 
 export default function Home() {
   let adminAddress = "placeholder";
@@ -16,6 +21,7 @@ export default function Home() {
   let adminBalance = 0;
   let isAdmin = false;
   let isManager = false;
+
 
   // todo if !isAdmin and !isManager -> unauthorized
 
