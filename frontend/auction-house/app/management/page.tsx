@@ -13,9 +13,14 @@ export default function Management() {
 
   const [adminAddress, setAdminAddress] = useState("");
   const [adminBalance, setAdminBal] = useState(0);
-  const [currFee, setFee] = useState(0);
+  const [currFee, setFeeText] = useState("0");
   const [isAdmin, setIsAdmin] = useState(false);
   const [isManager, setIsManager] = useState(true);
+
+  const [feeInput, setFeeInput] = useState(0);
+  const [mgrInput, setMgrInput] = useState("");
+  const [withdrawInput, setWithdrawInput] = useState(0);
+  const [adminAddrInput, setAdmAddrInput] = useState("");
 
   const houseService = useMemo(
     () => new HouseServiceProvider(state.address, state.provider, state.signer),
@@ -24,15 +29,19 @@ export default function Management() {
 
   useEffect(() => {
     if (state.isLoggedIn) {
-        houseService.getContract().admin().then(f => {
-            setAdminAddress(f);
-            setIsAdmin(ethers.getAddress(f) == ethers.getAddress(state.address));
+      houseService
+        .getContract()
+        .admin()
+        .then((f) => {
+          setAdminAddress(f);
+          setIsAdmin(ethers.getAddress(f) == ethers.getAddress(state.address));
         });
 
-        houseService.isManager().then((f) => setIsManager(f));
-    }
+      houseService.isManager().then((f) => setIsManager(f));
 
-  }, [state, houseService, isManager]);
+      houseService.getFee().then((f) => setFeeText(f.toString()));
+    }
+  }, [state, houseService, isManager, currFee]);
 
   if (!isManager) {
     return notFound();
@@ -73,15 +82,21 @@ export default function Management() {
               Uncollected House Balance: {adminBalance} AUC
             </Typography>
             <TextField
-                  id="standard-basic"
-                  label="Withdrawal Amount (AUC)"
-                  variant="standard"
+              id="standard-basic"
+              label="Withdrawal Amount (AUC)"
+              variant="standard"
+              type="number"
+              sx={{ pl: 2 }}
+              inputProps={{ min: 0 }}
+              onChange={(e) => setWithdrawInput(Number(e.target.value))}
             />
-            {/* TODO: AUC * 10^18 */}
-            <Button variant="contained" sx={{mt: 2}} disabled>
+            <Button
+              variant="contained"
+              sx={{ mt: 2 }}
+              disabled={adminBalance == 0 || withdrawInput > adminBalance}
+            >
               Withdraw to Admin
             </Button>
-            
           </Box>
           {
             /* Admin Only Section */
@@ -98,8 +113,13 @@ export default function Management() {
                   id="standard-basic"
                   label="Change Admin Address"
                   variant="standard"
+                  onChange={(e) => setAdmAddrInput(e.target.value)}
                 />
-                <Button variant="contained" sx={{ mt: 2, mb: 1 }}>
+                <Button
+                  variant="contained"
+                  sx={{ mt: 2, mb: 1 }}
+                  disabled={!ethers.isAddress(adminAddrInput)}
+                >
                   Update
                 </Button>
                 <Typography sx={{ mt: 3 }}>Add or Remove Managers:</Typography>
@@ -108,16 +128,30 @@ export default function Management() {
                   id="standard-basic"
                   label="Address"
                   variant="standard"
+                  onChange={(e) => setMgrInput(e.target.value)}
                 />
-                <Button variant="contained" sx={{ mt: 1, mb: 2 }}>
-                  Update
-                </Button>
+                <Box>
+                  <Button
+                    variant="contained"
+                    sx={{ mt: 1, mb: 2 }}
+                    disabled={!ethers.isAddress(mgrInput)}
+                  >
+                    Add
+                  </Button>
+                  <Button
+                    color="error"
+                    variant="contained"
+                    sx={{ mt: 1, mb: 2, ml: 2 }}
+                    disabled={!ethers.isAddress(mgrInput)}
+                  >
+                    Remove
+                  </Button>
+                </Box>
               </Box>
             ) : (
               <></>
             )
           }
-
           <Box
             sx={{
               pb: 2,
@@ -129,10 +163,19 @@ export default function Management() {
             <Typography>Current Fee: {currFee}%</Typography>
             <TextField
               id="standard-basic"
-              label="New Fee (%)"
+              label="Fee (%)"
+              type="number"
+              defaultValue={currFee}
+              inputProps={{ min: 0.0, max: 100 }}
               variant="standard"
+              onChange={(e) => setFeeInput(Number(e.target.value))}
             />
-            <Button variant="contained" sx={{ mt: 2 }}>
+            <Button
+              onClick={() => houseService.setFee(feeInput)}
+              variant="contained"
+              sx={{ mt: 2 }}
+              disabled={feeInput < 0 || feeInput > 100}
+            >
               Set Fee
             </Button>
           </Box>

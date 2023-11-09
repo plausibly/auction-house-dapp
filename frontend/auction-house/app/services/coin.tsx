@@ -29,12 +29,13 @@ export class CoinServiceProvider {
         return formatUnits(balance, decimals);
     }
 
-    async mintAUC(amnt: bigint) {
+    async mintAUC(amnt: number) {
         if (!this.signed) {
             return;
         }
-        const decimals: ethers.BigNumberish = ethers.toBigInt(await this.contract.decimals());
+        const decimals = Number(await this.contract.decimals());
 
-        await this.signed.mintToken(amnt * ethers.toBigInt(10) ** decimals);
+        await this.signed.mintToken(BigInt(amnt * 10 ** decimals));
     }
+
 }

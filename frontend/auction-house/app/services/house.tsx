@@ -1,6 +1,7 @@
 import { JsonRpcSigner, ethers } from "ethers";
 import AuctionHouse from "../../../../contracts/artifacts/contracts/AuctionHouse.sol/AuctionHouse.json";
 import { AuctionHouseContract } from "@/contract-details";
+import { BigNumberish } from "ethers";
 
 export class HouseServiceProvider {
     contract: ethers.Contract;
@@ -23,13 +24,20 @@ export class HouseServiceProvider {
         return this.signed;
     }
 
-    async isAdmin() {
-        console.log(await this.contract.admin());
-        return await this.contract.admin() === this.address;
-    }
-
     async isManager() {
         return await this.contract.managers(this.address);
     }
 
+    async setFee(amnt: number) {
+        if (!this.signed || amnt < 0) {
+            return;
+        }
+        const feeBp = (amnt / 100) * 10000;
+        await this.signed.setFee(BigInt(feeBp));
+    }
+
+    async getFee() {
+        const feeBp = Number(await this.contract.feeBp());
+        return (feeBp / 10000) * 100;
+    }
 }
