@@ -13,13 +13,16 @@ export default function Header() {
     <AppBar position="static" elevation={0} >
       <Toolbar sx={{ flexWrap: 'wrap' }}>
         <Typography variant="h6" color="inherit" noWrap sx={{ flexGrow: 1 }}>
-          Auction House
+          [..]
         </Typography>
         <Link sx ={{my: 1, mx: 1.5, textDecoration: 'none'}} href="/" >
             Home
         </Link>
         <Link sx ={{my: 1, mx: 1.5, textDecoration: 'none'}} href="/mint">
             Mint
+        </Link>
+        <Link sx ={{my: 1, mx: 1.5, textDecoration: 'none'}} href="/auction/create">
+            Auction
         </Link>
         <Link sx ={{my: 1, mx: 1.5, textDecoration: 'none'}} href="/management">
             Management
