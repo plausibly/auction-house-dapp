@@ -1,28 +1,35 @@
 "use client";
-import React from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Box, Button, Container, Grid, Switch, TextField } from "@mui/material";
 import Typography from "@mui/material/Typography";
 import Header from "../../components/Header";
+import { useLoginContext } from "@/contexts/LoginContextProvider";
+import { CoinServiceProvider } from "../services/coin";
 
 export default function Mint() {
-  let adminAddress = "placeholder";
-  let currFee = 0; // convert Bp -> %
-  let adminBalance = 0;
-  let isAdmin = false;
-  let isManager = false;
+  const state = useLoginContext().state;
 
-  const loginAddress = "0x0";
-  // todo if !isAdmin and !isManager -> unauthorized
+  const [items, setItems] = useState(1);
+  const [auc, setAuc] = useState("0");
 
-  const inputRegex = "/^[a-zA-Z0-9-]+";
-
-  const [items, setItems] = React.useState(1);
-
-  let itemInputs: Array<React.JSX.Element> = [];
+  // input box
+  const [toMint, setMintAmnt] = useState(BigInt(0));
 
   //todo input validation
-  
+  //todo force login
 
+  const coinService = useMemo(() => new CoinServiceProvider(state.address, state.provider, state.signer), [state.address, state.provider, state.signer]);
+
+  // AUC Amount
+  useEffect(() => {
+    if (state.isLoggedIn) {
+      coinService.getAUC().then(f => setAuc(f.toString()));
+    }
+  }, [state, coinService]);
+
+
+  // item metadata for each minted in an erc-721 contract
+  let itemInputs: Array<React.JSX.Element> = [];
   for (let i = 0; i < items; i++) {
     itemInputs.push(
       <Grid item xs={8} key={i+1}>
@@ -46,6 +53,14 @@ export default function Mint() {
         <Typography>Image</Typography>
         <input type="file" />
       </Grid>
+    );
+  }
+
+  if (!state.isLoggedIn && !state.provider) {
+    return (
+      <>
+      <Header/>
+      <Typography variant="h5" sx={{m: 1, p: 2}}>Unauthorized. Please login</Typography></>
     );
   }
 
@@ -111,14 +126,15 @@ export default function Mint() {
             id="standard-basic"
             label="Amount (in AUC)"
             variant="filled"
+            onChange={(e) => setMintAmnt(BigInt(e.target.value))}
           />
-          <Button sx={{ ml: 1 }} variant="outlined">
+          <Button onClick={() => coinService.mintAUC(toMint)} sx={{ ml: 1 }} variant="outlined">
             Mint
           </Button>
         </Grid>
         <Grid item xs={12}>
         <Typography>
-            AUC Balance: 0
+            AUC Balance: {auc}
           </Typography>
         </Grid>
       </Grid>

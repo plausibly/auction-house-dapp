@@ -6,42 +6,32 @@ import Toolbar from "@mui/material/Toolbar";
 import Typography from "@mui/material/Typography";
 import Link from "@mui/material/Link";
 import BalanceWallet from "@mui/icons-material/AccountBalanceWallet";
-
-import { ethers } from "ethers";
 import { useLoginContext } from "@/contexts/LoginContextProvider";
-
-async function HandleLogin() {
-  const { ethereum } = window;
-  let provider;
-  ethers.BrowserProvider;
-  let signer: ethers.JsonRpcSigner | undefined;
-  if (localStorage.hasOwnProperty("IsLoggedIn")) {
-    return;
-  }
-  if (ethereum == null) {
-    alert("No wallet extension detected.");
-    return;
-  }
-
-  provider = new ethers.BrowserProvider(window.ethereum);
-  signer = await provider.getSigner();
-
-  localStorage.setItem("IsLoggedIn", "true");
-  localStorage.setItem("Provider", JSON.stringify(provider));
-  localStorage.setItem("Signer", JSON.stringify(signer));
-
-  return { provider, signer };
-}
+import { CoinServiceProvider } from "@/app/services/coin";
 
 export default function Header() {
   const { login, logout, state } = useLoginContext();
+  let coinService: CoinServiceProvider | undefined = undefined;
+
+  const [auc, setAuc] = useState("0");
+
+  if (state.isLoggedIn && state.provider) {
+    coinService = new CoinServiceProvider(state.address, state.provider);
+  }
+
+  useEffect(() => {
+    if (state.isLoggedIn && coinService) {
+      coinService.getAUC().then(f => setAuc(f.toString()));
+    }
+    
+  }, [state, coinService]);
 
   return (
     <AppBar position="static" elevation={0}>
       <Toolbar sx={{ flexWrap: "wrap" }}>
         {state.isLoggedIn ? (
           <Typography variant="h6" color="inherit" noWrap sx={{ flexGrow: 1 }}>
-            Address: {state.address}, AUC: 0
+            Address: {state.address}, AUC: {auc}
           </Typography>
         ) : (
           <Typography variant="h6" color="inherit" noWrap sx={{ flexGrow: 1 }}>

@@ -2,9 +2,9 @@ import { BrowserProvider, ethers, JsonRpcSigner } from "ethers";
 import { useCallback, useEffect, useState } from "react";
 
 export interface LoginState {
-  address?: string;
-  signer?: JsonRpcSigner;
-  provider?: BrowserProvider;
+  address: string;
+  signer: JsonRpcSigner;
+  provider: BrowserProvider;
   isLoggedIn: boolean;
 }
 

@@ -15,7 +15,7 @@ contract AuctionHouseCoin is ERC20 {
         _mint(msg.sender, amnt);
     }
 
-    function myBalance() public view returns (uint256) {
+    function myBalance() public view returns (uint256) { // REMOVE THIS
         return this.balanceOf(msg.sender);
     }
 }
