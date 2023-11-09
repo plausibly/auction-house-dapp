@@ -6,8 +6,7 @@ import ThemeRegistry from '@/utils/themeregistry'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Auction House',
-  description: '',
+  title: 'An inconspicious crypto site',
 }
 
 export default function RootLayout({
