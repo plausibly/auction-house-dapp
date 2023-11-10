@@ -5,8 +5,9 @@ pragma solidity >=0.4.22 <0.9.0;
 import "contracts/AuctionHouseCoin.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 
-/// @title Auction House
+/// @title Auction House.
 /// @author plausibly
+/// Contains functionality to auction and bid on ERC-721 digital items
 contract AuctionHouse is IERC721Receiver {
     address public admin;
 
@@ -34,7 +35,7 @@ contract AuctionHouse is IERC721Receiver {
 // todo add emits later
     event AuctionCreated(uint256 id);
     event AuctionCancelled(uint256 id);
-    event AuctionEnded(uint256 id, bool forced);
+    event AuctionEnded(uint256 id);
     event BidPlaced(uint256 id, uint256 newBid);
     event ItemClaimed(uint256 id);
     event FeeChanged(uint fee);
@@ -57,6 +58,10 @@ contract AuctionHouse is IERC721Receiver {
         lock = false;
     }
 
+    /// Construct an AuctionHouse
+    /// @param _admin The admin address
+    /// @param _fee The starting fee
+    /// @param _coin The address of the ERC-20 contract used as the currency for the house
     constructor(address _admin, uint _fee, AuctionHouseCoin _coin) {
         admin = _admin;
         managers[admin] = true;
@@ -68,26 +73,41 @@ contract AuctionHouse is IERC721Receiver {
     /* General Use */
 
 //TODO PLAN
-    /// Required override
+
+    /// Required override for solidity ERC-721 receiver
     function onERC721Received(address operator, address from, uint256 tokenId, bytes calldata data) external pure returns (bytes4) { 
         return IERC721Receiver.onERC721Received.selector;
     }
 
-    function getHighestBidder(uint256 id) public view returns (address) {
-        return auctions[id].highestBidder;
-    }
-
+    /// Trigger a claim for an auction that has ended. This will send the item to the highest bidder,
+    /// and the bid to the seller.
+    /// @param id auction id
     function claimItems(uint256 id) public {
         AuctionItem memory item = auctions[id];
         require(item.endTime != 0, "Auction does not exist");
         require(item.highestBidder != address(0), "No one bid on the item. There is nothing to claim");
         //TODO time validate
         //TODO handle expired auction no bids
-        transferAndCompleteAuction(item);
+        uint houseCut = item.highestBid * (feeBp / 10000);
+        uint sellerCut = item.highestBid - houseCut;
+        collectedFees += houseCut;
+        IERC721 nfts = IERC721(item.contractId);
+        nfts.transferFrom(address(this), item.highestBidder, item.tokenId);
+        if (sellerCut > 0) {
+            // the house could theoretically have 100% fee
+            coin.transferFrom(address(this), item.seller, sellerCut);
+        }
+
+        delete(auctions[item.tokenId]);
     }
     
     /* Auction Control (Selling) */
 
+    /// Create an auction with the provided details. Sends the ERC-721 item to the house for auctioning.
+    /// @param contractAddress Address of ERC-721 contract with the auctioned item
+    /// @param tokenId TokenID of the item being auctioned
+    /// @param startPrice The starting price for bids
+    /// @param endTime The auction end date
     function createAuction(address contractAddress, uint256 tokenId, uint256 startPrice, uint endTime) public  {
         IERC721 nfts = IERC721(contractAddress);
         require(nfts.ownerOf(tokenId) == msg.sender, "Cannot auction item you do not own!");
@@ -102,8 +122,11 @@ contract AuctionHouse is IERC721Receiver {
         emit AuctionCreated(aucId);
     }
 
+    /// Lowers the starting price of an existing auction if bids have not been started.
+    /// @param id auction id
+    /// @param newPrice the price to lower to
     function lowerPrice(uint256 id, uint256 newPrice) public {
-        AuctionItem memory item = auctions[id];
+        AuctionItem storage item = auctions[id];
     
         require(item.endTime != 0, "Auction does not exist");
         require(item.seller == msg.sender, "You are not the seller");
@@ -111,9 +134,11 @@ contract AuctionHouse is IERC721Receiver {
         require(item.highestBidder == address(0), "Cannot lower price once bids have started");
         require(newPrice < item.highestBid, "New starting price must be lower than current price");
     
-        auctions[id].highestBid = newPrice;
+        item.highestBid = newPrice;
     }
 
+    /// Cancels a running auction. Refunds potential buyer and the seller.
+    /// @param id auction id
     function cancelAuction(uint256 id) public noReentry {
         AuctionItem memory item = auctions[id];
         require(item.endTime != 0, "Auction does not exist");
@@ -121,27 +146,27 @@ contract AuctionHouse is IERC721Receiver {
         // TODO END TIME VALIDATION. HOW!!
         IERC721 nfts = IERC721(item.contractId);
         
+        // refund items
         nfts.transferFrom(address(this), msg.sender, item.tokenId);
-        coin.transferFrom(address(this), item.highestBidder, item.highestBid);
+
+        if(item.highestBidder != address(0)) {
+            coin.approve(address(this), item.highestBid);
+            coin.transferFrom(address(this), item.highestBidder, item.highestBid);
+        }
+
         delete(auctions[id]);
         emit AuctionCancelled(id);
     }
 
+    /// Ends a running auction. This will trigger payment to the seller, and item sent to buyer.
+    /// @param id auction id
     function forceEndAuction(uint256 id) public {
         AuctionItem memory item = auctions[id];
         require(item.endTime != 0, "Auction does not exist");
         require(item.seller == msg.sender, "You are not the seller");
         require(item.highestBidder != address(0), "No bids have been placed, cannot end. You may cancel the auction instead");
         // TODO END TIME VALIDATION. HOW!!
-        transferAndCompleteAuction(item);
-    }
-
-    function transferAndCompleteAuction(AuctionItem memory item) noReentry private {
-        require(item.endTime != 0, "Auction does not exist");
-        // this can be called by anyone if an auction has already ended, or if the seller is forcing an end
-        require(item.seller == msg.sender, "You are not the seller");
-        require(item.highestBidder != address(0), "No bids have been placed to complete this auction.");
-
+        
         uint houseCut = item.highestBid * (feeBp / 10000);
         uint sellerCut = item.highestBid - houseCut;
         collectedFees += houseCut;
@@ -149,24 +174,27 @@ contract AuctionHouse is IERC721Receiver {
         nfts.transferFrom(address(this), item.highestBidder, item.tokenId);
         if (sellerCut > 0) {
             // the house could theoretically have 100% fee
+            coin.approve(address(this), sellerCut);
             coin.transferFrom(address(this), item.seller, sellerCut);
         }
 
-        delete(auctions[item.tokenId]);
-
-        // TODO if time -> emit claim, else emit auctionended
+        delete(auctions[id]);
+        emit AuctionEnded(id);
     }
 
-    /* Bidding */
-
-    function placeBid(uint256 id, uint256 bidAmnt) public {
+    /// Places a bid on the provided auction with the amount. Reverts if the bid is not higher than the previous bid. 
+    /// The old bidder will be refunded, and the new bid will be sent to the house.
+    /// @param id Auction Id
+    /// @param bidAmnt amount to bid
+    function placeBid(uint256 id, uint256 bidAmnt) noReentry public {
         AuctionItem storage item = auctions[id];
         require(item.endTime != 0, "Auction does not exist");
         require(coin.balanceOf(msg.sender) >= bidAmnt, "You do not have enough AUC to place this bid");
         // if there was a previous bid, the new bid should be strictly greater (otherwise highestBid is the startprice)
-        require(bidAmnt >= item.highestBid || (item.highestBidder != address(0) && bidAmnt > item.highestBid), "Bid is too low");
+        require(bidAmnt > item.highestBid || (item.highestBidder == address(0) && bidAmnt >= item.highestBid), "Bid is too low");
         if (item.highestBidder != address(0)) {
             // refund the previous (highest) bid
+            coin.approve(address(this), item.highestBid);
             coin.transferFrom(address(this), item.highestBidder, item.highestBid);
         }
         coin.transferFrom(msg.sender, address(this), bidAmnt);
@@ -200,10 +228,12 @@ contract AuctionHouse is IERC721Receiver {
 
     /* Admin or Manager */
 
-    /// Withdraws the collected fees into the admin address
+    /// Withdraws an amount of AUC from the contract into the admin address
+    /// @param amnt amount to withdraw
     function withdrawFees(uint256 amnt) onlyManagers public {
         require(collectedFees >= amnt, "Insufficient Balance to withdraw specified amount");
         collectedFees = collectedFees - amnt;
+        coin.approve(address(this), amnt);
         coin.transferFrom(address(this), admin, amnt);
     }
 
