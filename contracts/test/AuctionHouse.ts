@@ -25,7 +25,7 @@ describe("General Tests", () => {
         const [admin] = await ethers.getSigners();
         const adminAddress = await admin.getAddress();
         expect(await house.admin()).to.equal(adminAddress);
-        expect(await house.getFeesCollected()).to.equal(0);
+        expect(await house.collectedFees()).to.equal(0);
         expect(await house.feeBp()).to.equal(250);
         // no initial items, or coins exist 
         expect(await coin.balanceOf(adminAddress)).to.equal(0);
@@ -43,7 +43,7 @@ describe("General Tests", () => {
         // old admin should lose permissions
         await expect(house.setAdmin(oldAdmin)).to.be.revertedWith(permError);
         // ensure old admin loses managerial perms too
-        await expect(house.getFeesCollected()).to.be.revertedWith(permError);
+        await expect(house.collectedFees()).to.be.revertedWith(permError);
     });
 
     it("Admin can add and remove managers", async () => {
@@ -64,7 +64,7 @@ describe("General Tests", () => {
 
         // admins are managers (but managers arent admin)
         expect(await house.managers(await admin.getAddress())).to.be.true;
-        expect(await house.getFeesCollected()).to.equal(0);
+        expect(await house.collectedFees()).to.equal(0);
         await expect(house.withdrawFees(2)).to.be.revertedWith("Insufficient Balance to withdraw specified amount");
         expect(await house.setFee(22)).to.not.be.revertedWith(permError);
         expect(await house.feeBp()).to.be.equal(22);
@@ -72,14 +72,14 @@ describe("General Tests", () => {
         await house.addManager(addr);
         // manager
         expect(await manager.managers(await addr.getAddress())).to.be.true;
-        expect(await manager.getFeesCollected()).to.equal(0);
+        expect(await manager.collectedFees()).to.equal(0);
         await expect(manager.withdrawFees(2)).to.be.revertedWith("Insufficient Balance to withdraw specified amount");
         await expect(manager.setFee(1)).to.not.be.revertedWith(permError);
         expect(await manager.feeBp()).to.be.equal(1);
 
         // users should not have access
         expect(await user.managers(await user.getAddress())).to.be.false;
-        await expect(user.getFeesCollected()).to.be.revertedWith(permError);
+        await expect(user.collectedFees()).to.be.revertedWith(permError);
         await expect(user.withdrawFees(2)).to.be.revertedWith(permError);
         await expect(user.setFee(22)).to.be.revertedWith(permError);
 

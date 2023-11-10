@@ -7,8 +7,8 @@ import Typography from "@mui/material/Typography";
 import Link from "@mui/material/Link";
 import BalanceWallet from "@mui/icons-material/AccountBalanceWallet";
 import { useLoginContext } from "@/contexts/LoginContextProvider";
-import { CoinServiceProvider } from "@/app/services/coin";
-import { HouseServiceProvider } from "@/app/services/house";
+import { CoinServiceProvider } from "@/services/coin";
+import { HouseServiceProvider } from "@/services/house";
 
 export default function Header() {
   const { login, logout, state } = useLoginContext();

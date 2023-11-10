@@ -5,7 +5,7 @@ import Typography from "@mui/material/Typography";
 import Header from "../../components/Header";
 import { useLoginContext } from "@/contexts/LoginContextProvider";
 import { notFound, redirect } from "next/navigation";
-import { HouseServiceProvider } from "../services/house";
+import { HouseServiceProvider } from "../../services/house";
 import { ethers } from "ethers";
 
 export default function Management() {
@@ -119,6 +119,7 @@ export default function Management() {
                   variant="contained"
                   sx={{ mt: 2, mb: 1 }}
                   disabled={!ethers.isAddress(adminAddrInput)}
+                  onClick={() => houseService.setAdmin(adminAddrInput)}
                 >
                   Update
                 </Button>
@@ -135,6 +136,7 @@ export default function Management() {
                     variant="contained"
                     sx={{ mt: 1, mb: 2 }}
                     disabled={!ethers.isAddress(mgrInput)}
+                    onClick={() => houseService.addManager(mgrInput)}
                   >
                     Add
                   </Button>
@@ -143,6 +145,7 @@ export default function Management() {
                     variant="contained"
                     sx={{ mt: 1, mb: 2, ml: 2 }}
                     disabled={!ethers.isAddress(mgrInput)}
+                    onClick={() => houseService.removeManager(mgrInput)}
                   >
                     Remove
                   </Button>

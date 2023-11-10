@@ -4,7 +4,7 @@ import { Box, Button, Container, Grid, Switch, TextField } from "@mui/material";
 import Typography from "@mui/material/Typography";
 import Header from "../../components/Header";
 import { useLoginContext } from "@/contexts/LoginContextProvider";
-import { CoinServiceProvider } from "../services/coin";
+import { CoinServiceProvider } from "../../services/coin";
 
 export default function Mint() {
   const state = useLoginContext().state;

@@ -1,5 +1,5 @@
 import { JsonRpcSigner, ethers, formatUnits } from "ethers";
-import AuctionHouseCoin from "../../../../contracts/artifacts/contracts/AuctionHouseCoin.sol/AuctionHouseCoin.json";
+import AuctionHouseCoin from "../../../contracts/artifacts/contracts/AuctionHouseCoin.sol/AuctionHouseCoin.json";
 import { CoinContract } from "@/contract-details";
 
 export class CoinServiceProvider {
@@ -37,5 +37,4 @@ export class CoinServiceProvider {
 
         await this.signed.mintToken(BigInt(amnt * 10 ** decimals));
     }
-
 }

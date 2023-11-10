@@ -13,11 +13,11 @@ contract AuctionHouse is IERC721Receiver {
     bool internal lock;
     
     uint public feeBp; // Fee in basis points. Must divide by 10k when using operations
-    uint256 private collectedFees;
+    uint256 public collectedFees;
 
     uint256 internal auctionId; // each auction has a unique id, increment this for each auction creation
 
-    AuctionHouseCoin private coin;
+    AuctionHouseCoin internal coin;
 
     mapping (address => bool) public managers; // indicates whether an address is a manager (or admin)
     mapping (uint256 => AuctionItem) public auctions; // maps auctionId to the auction item (if the auction exists)
@@ -200,16 +200,10 @@ contract AuctionHouse is IERC721Receiver {
 
     /* Admin or Manager */
 
-    /// Gets the total fees collected by the house that has yet to be withdrawn
-    function getFeesCollected() onlyManagers public view returns (uint) {
-        return collectedFees;
-    }
-
     /// Withdraws the collected fees into the admin address
     function withdrawFees(uint256 amnt) onlyManagers public {
-        uint256 balance = getFeesCollected();
-        require(balance >= amnt, "Insufficient Balance to withdraw specified amount");
-        collectedFees = balance - amnt;
+        require(collectedFees >= amnt, "Insufficient Balance to withdraw specified amount");
+        collectedFees = collectedFees - amnt;
         coin.transferFrom(address(this), admin, amnt);
     }
 
