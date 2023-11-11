@@ -7,8 +7,8 @@ import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 
 /// @title Auction House.
 /// @author plausibly
-/// Contains functionality to auction and bid on ERC-721 digital items
-contract AuctionHouse is IERC721Receiver {
+/// @notice Contains functionality to auction and bid on ERC-721 digital items
+contract AuctionHouse {
     address public admin;
 
     bool internal lock;
@@ -42,7 +42,7 @@ contract AuctionHouse is IERC721Receiver {
     event FeeChanged(uint fee);
     event PriceLowered(uint256 id, uint256 newPrice);
 
-    /// Ensures that an auction exists in the mapping, and is not archived. Optionally,
+    /// @notice Ensures that an auction exists in the mapping, and is not archived. Optionally,
     /// can verify if the sender is the seller.
     /// @param id the auction id for the mapping lookup
     /// @param enforceSeller whether or not to check if the seller sent the request
@@ -70,7 +70,7 @@ contract AuctionHouse is IERC721Receiver {
         lock = false;
     }
 
-    /// Construct an AuctionHouse
+    /// @notice Construct an AuctionHouse
     /// @param _admin The admin address
     /// @param _fee The starting fee
     /// @param _coin The address of the ERC-20 contract used as the currency for the house
@@ -84,15 +84,7 @@ contract AuctionHouse is IERC721Receiver {
 
     /* General Use */
 
-//TODO PLAN
-
-    /// Required override for solidity ERC-721 receiver
-    function onERC721Received(address operator, address from, uint256 tokenId, bytes calldata data) external pure returns (bytes4) { 
-        return IERC721Receiver.onERC721Received.selector;
-    }
-
-    /// Trigger a claim for an auction that has ended. This will send the item to the highest bidder,
-    /// and the bid to the seller.
+    /// @notice Trigger a claim for an auction that has ended. This will send the item to the highest bidder, and the bid to the seller.
     /// @param id auction id
     function claimItems(uint256 id) validAuction(id, false) noReentry public {
         AuctionItem memory item = auctions[id];
@@ -117,7 +109,7 @@ contract AuctionHouse is IERC721Receiver {
 
     /* Auction Control (Selling) */
 
-    /// Create an auction with the provided details. Sends the ERC-721 item to the house for auctioning.
+    /// @notice Create an auction with the provided details. Sends the ERC-721 item to the house for auctioning.
     /// @param contractAddress Address of ERC-721 contract with the auctioned item
     /// @param tokenId TokenID of the item being auctioned
     /// @param startPrice The starting price for bids
@@ -129,14 +121,14 @@ contract AuctionHouse is IERC721Receiver {
         require(startPrice > 0, "Starting price must be > 0");
         require(endTime > block.timestamp, "End time must be in the future");
 
-        nfts.safeTransferFrom(msg.sender, address(this), tokenId);
+        nfts.transferFrom(msg.sender, address(this), tokenId);
         uint256 aucId = auctionId;
         auctionId++;
         auctions[aucId] = AuctionItem(msg.sender, contractAddress, tokenId, endTime, startPrice, address(0), false);
         emit AuctionCreated(aucId);
     }
 
-    /// Lowers the starting price of an existing auction if bids have not been started.
+    /// @notice Lowers the starting price of an existing auction if bids have not been started.
     /// @param id auction id
     /// @param newPrice the price to lower to
     function lowerPrice(uint256 id, uint256 newPrice) validAuction(id, true) public {
@@ -151,7 +143,7 @@ contract AuctionHouse is IERC721Receiver {
         emit PriceLowered(id, newPrice);
     }
 
-    /// Cancels a running auction. Refunds potential buyer and the seller.
+    /// @notice Cancels a running auction. Refunds potential buyer and the seller.
     /// @param id auction id
     function cancelAuction(uint256 id) validAuction(id, true) noReentry public {
         AuctionItem memory item = auctions[id];
@@ -172,7 +164,7 @@ contract AuctionHouse is IERC721Receiver {
         emit AuctionCancelled(id);
     }
 
-    /// Ends a running auction. This will trigger payment to the seller, and item sent to buyer.
+    /// @notice Ends a running auction. This will trigger payment to the seller, and item sent to buyer.
     /// @param id auction id
     function forceEndAuction(uint256 id) validAuction(id, true) public {
         AuctionItem memory item = auctions[id];
@@ -195,7 +187,7 @@ contract AuctionHouse is IERC721Receiver {
         emit AuctionEnded(id);
     }
 
-    /// Places a bid on the provided auction with the amount. Reverts if the bid is not higher than the previous bid. 
+    /// @notice Places a bid on the provided auction with the amount. Reverts if the bid is not higher than the previous bid.  
     /// The old bidder will be refunded, and the new bid will be sent to the house.
     /// @param id Auction Id
     /// @param bidAmnt amount to bid
@@ -220,7 +212,7 @@ contract AuctionHouse is IERC721Receiver {
 
     /* Admin Only */
 
-    /// Replaces the admin address with a new one.
+    /// @notice Replaces the admin address with a new one.
     /// @param newAdmin The address to set as admin
     function setAdmin(address newAdmin) onlyAdmin public {
         managers[msg.sender] = false;
@@ -229,13 +221,13 @@ contract AuctionHouse is IERC721Receiver {
         managers[admin] = true;
     }
 
-    /// Adds a new manager
+    /// @notice Adds a new manager
     /// @param addr Address to become manager
     function addManager(address addr) onlyAdmin public {
         managers[addr] = true; 
     }
 
-    /// Removes a manager.
+    /// @notice Removes a manager.
     /// @param addr Address to become manager
     function removeManager(address addr) onlyAdmin public {
         managers[addr] = false;
@@ -243,7 +235,7 @@ contract AuctionHouse is IERC721Receiver {
 
     /* Admin or Manager */
 
-    /// Withdraws an amount of AUC from the contract into the admin address
+    /// @notice Withdraws an amount of AUC from the contract into the admin address
     /// @param amnt amount to withdraw
     function withdrawFees(uint256 amnt) onlyManagers public {
         require(collectedFees >= amnt, "Insufficient Balance to withdraw specified amount");
@@ -252,7 +244,7 @@ contract AuctionHouse is IERC721Receiver {
         coin.transferFrom(address(this), admin, amnt);
     }
 
-    /// Changes the house fee
+    /// @notice Changes the house fee
     /// @param _fee Fee in basis points (where 1% = 0.01 * 10,000 BP)
     function setFee(uint _fee) onlyManagers public {
         require(_fee >= 0 && _fee <= 10000, "Fee must be positive and cannot exceed 10,000 BP");
@@ -260,8 +252,9 @@ contract AuctionHouse is IERC721Receiver {
         emit FeeChanged(feeBp);
     }
 
-    /// Helper function to compute the house cut (fees) based on amnt
+    /// @notice Helper function to compute the house cut (fees) based on amnt
     /// @param amnt Amount to apply fee to
+    /// @return The house cut taken from amount
     function calculateHouseCut(uint256 amnt) private view returns(uint256) {
         return amnt * feeBp / 10000;
     }
