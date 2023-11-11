@@ -1,13 +1,25 @@
-# Sample Hardhat Project
+# Auction House
 
-This project demonstrates a basic Hardhat use case. It comes with a sample contract, a test for that contract, and a script that deploys that contract.
+To deploy this project, create a file called `_env.ts` in the root directory and provide the following:
 
-Try running some of the following tasks:
+```
+export const ADMIN_ADDRESS = <YOUR ADDRESS TO USE AS ADMIN>;
+export const PRIVATE_KEY = <Deployer private key>;
+export const ALCHEMY_API_KEY = <API Key>;
+```
 
-```shell
-npx hardhat help
+Optionally, you may edit the `hardhat.config.ts` file and provide your own details.
+
+
+The default configuration will deploy the ERC-20 contract (AUC currency) and the house contract onto the Sepolia test network.
+
+```
+npx hardhat run scripts/deploy.ts --network sepolia
+```
+
+
+Tests can be ran with:
+
+```
 npx hardhat test
-REPORT_GAS=true npx hardhat test
-npx hardhat node
-npx hardhat run scripts/deploy.ts
 ```

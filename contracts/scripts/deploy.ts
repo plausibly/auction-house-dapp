@@ -1,17 +1,14 @@
 import { ethers } from "hardhat";
-import { adminAddress } from "../_env";
+import { ADMIN_ADDRESS } from "../_env";
 
 async function main() {
-  const coinFactory = await ethers.getContractFactory("AuctionHouseCoin");
-
-  const coin = await coinFactory.deploy();
-
+  const coin = await ethers.deployContract("AuctionHouseCoin");
   await coin.waitForDeployment();
 
-  let houseFactory = await ethers.getContractFactory("AuctionHouse");
-  const house = await houseFactory.deploy(adminAddress, 250, await coin.getAddress());
+  const houseFactory = await ethers.getContractFactory("AuctionHouse");
+  const house = await houseFactory.deploy(ADMIN_ADDRESS, 250, await coin.getAddress());
 
-  console.log(`Auction House deployed to ${house.target}. AUC coin (ERC-20) deployed to ${coin.target}`);
+  console.log(`Auction House deployed to ${house.target} \n AUC (ERC-20) deployed to ${coin.target}`);
 }
 
 // We recommend this pattern to be able to use async/await everywhere
