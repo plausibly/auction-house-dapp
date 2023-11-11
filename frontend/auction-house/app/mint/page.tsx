@@ -10,6 +10,7 @@ import { NFT_STORAGE_API } from "@/_env";
 import { Contract, ethers } from "ethers";
 import { ContractFactory } from "ethers";
 import AuctionHouseItem from "../../../../contracts/artifacts/contracts/AuctionHouseItem.sol/AuctionHouseItem.json";
+import { ItemServiceProvider } from "@/services/item";
 
 interface NFTInput {
   cname: string;
@@ -27,6 +28,7 @@ export default function Mint() {
   );
 
   const [numberItems, setItems] = useState(1);
+  const [isBtnDisabled, setIsDisabled] = useState(true);
 
   // input box (mint auc)
   const [toMint, setMintAmnt] = useState(0);
@@ -40,26 +42,35 @@ export default function Mint() {
     images: [],
   });
 
-  const [banner, setBanner] = useState({ color: "white", msg: "" });
+  useEffect(() => {
+    let form = nftForm;
 
-  const formHandler = async () => {
-    if (
+    // clear inputs if items is decreased
+    form.images = form.images.slice(0, numberItems);
+    form.itemNames = form.itemNames.slice(0, numberItems);
+    form.itemDescs = form.itemNames.slice(0, numberItems);
+
+    // disable button if inputs are missing
+    setIsDisabled(
       nftForm.cname.length === 0 ||
       numberItems === 0 ||
       nftForm.symbol.length === 0 ||
       nftForm.itemNames.length !== nftForm.itemDescs.length ||
       nftForm.itemNames.length !== numberItems ||
-      nftForm.images.length !== numberItems
-    ) {
-      setBanner({ color: "red", msg: "Please fill out all required details." });
-      return;
-    }
+      nftForm.images.length !== numberItems);
 
+    setNftForm(form);
+    
+  }, [numberItems, nftForm, isBtnDisabled]);
+
+  const [banner, setBanner] = useState({ color: "white", msg: "" });
+
+  const formHandler = async () => {
     for (let i of nftForm.images) {
       if (!i) {
         setBanner({
           color: "red",
-          msg: "Please ensure images are set for all items",
+          msg: "Please ensure valid images are set for all items",
         });
         return;
       }
@@ -105,14 +116,14 @@ export default function Mint() {
         console.log("url: " + store.url);
       }
 
-      const contractConnection = new Contract(
+      //TODO TEST THIS AGAIN
+      const contractConnection = new ItemServiceProvider(
         contractAddress,
-        AuctionHouseItem.abi,
+        state.address,
+        state.provider,
         state.signer
       );
       await contractConnection.bulkMint(nftUrls);
-
-      console.log(nftUrls);
 
       setBanner({
         color: "green",
@@ -213,8 +224,8 @@ export default function Mint() {
           <TextField
             sx={{ pr: 2 }}
             required
-            label="Token Symbol (3 Letters)"
-            inputProps={{ maxLength: 3, style: { textTransform: "uppercase" } }}
+            label="Token Symbol"
+            inputProps={{ style: { textTransform: "uppercase" } }}
             onKeyDown={(e) => {
               if (!/^[a-zA-Z]+$/.test(e.key)) {
                 e.preventDefault();
@@ -240,7 +251,12 @@ export default function Mint() {
         {itemInputs}
 
         <Grid item xs={12}>
-          <Button variant="contained" onClick={() => formHandler()}>
+          <Button
+            variant="contained"
+      
+            disabled={isBtnDisabled}
+            onClick={() => formHandler()}
+          >
             Create
           </Button>
         </Grid>

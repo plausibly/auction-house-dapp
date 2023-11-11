@@ -27,6 +27,19 @@ export class HouseServiceProvider {
         return this.signed;
     }
 
+    async createAuction(address: string, tokenId: number, price: number, endDate: Date) {
+        if (!this.signed) {
+            return;
+        }
+
+        //TODO APPROVE NFT... ALSO APPROVALS ON ALL OTHER FUNCS
+
+        const formatPrice = BigInt(price * 10 ** 18);
+        const end = Math.floor(endDate.getTime() / 1000); // epoch time
+
+        return await this.signed.createAuction(address, tokenId, formatPrice, end);
+    }
+
     async isManager() {
         return await this.contract.managers(this.address);
     }
