@@ -5,12 +5,18 @@ import Typography from "@mui/material/Typography";
 import Header from "../../components/Header";
 import { useLoginContext } from "@/contexts/LoginContextProvider";
 import { CoinServiceProvider } from "../../services/coin";
+import { NFTStorage, File } from "nft.storage";
+import { NFT_STORAGE_API } from "@/_env";
+import { Contract, ethers } from "ethers";
+import { ContractFactory } from "ethers";
+import AuctionHouseItem from "../../../../contracts/artifacts/contracts/AuctionHouseItem.sol/AuctionHouseItem.json";
 
 interface NFTInput {
   cname: string;
   symbol: string;
   itemNames: Array<string>;
   itemDescs: Array<string>;
+  images: Array<File>;
 }
 
 export default function Mint() {
@@ -20,7 +26,7 @@ export default function Mint() {
     [state.address, state.provider, state.signer]
   );
 
-  const [items, setItems] = useState(1);
+  const [numberItems, setItems] = useState(1);
 
   // input box (mint auc)
   const [toMint, setMintAmnt] = useState(0);
@@ -31,40 +37,96 @@ export default function Mint() {
     symbol: "",
     itemNames: [],
     itemDescs: [],
+    images: [],
   });
 
   const [banner, setBanner] = useState({ color: "white", msg: "" });
 
-  const formHandler = () => {
+  const formHandler = async () => {
     if (
       nftForm.cname.length === 0 ||
-      items === 0 ||
+      numberItems === 0 ||
       nftForm.symbol.length === 0 ||
       nftForm.itemNames.length !== nftForm.itemDescs.length ||
-      nftForm.itemNames.length !== items
+      nftForm.itemNames.length !== numberItems ||
+      nftForm.images.length !== numberItems
     ) {
       setBanner({ color: "red", msg: "Please fill out all required details." });
       return;
     }
 
-    // stringified JSON, will be uploaded to nft storage
-    let jsonMetaData: Array<string> = [];
-
-    for (let i = 0; i < items; i++) {
-      jsonMetaData.push(JSON.stringify({
-        name: nftForm.itemNames[i],
-        description: nftForm.itemDescs[i]
-      }));
+    for (let i of nftForm.images) {
+      if (!i) {
+        setBanner({
+          color: "red",
+          msg: "Please ensure images are set for all items",
+        });
+        return;
+      }
     }
 
-    const contractAddress = "";
+    try {
+      setBanner({
+        color: "green",
+        msg: "Creating ERC-721 contract... please wait",
+      });
 
-    setBanner({ color: "white", msg: "NFT created. Contract deployed to: " + contractAddress});
+      const contractFactory = new ContractFactory(
+        AuctionHouseItem.abi,
+        AuctionHouseItem.bytecode,
+        state.signer
+      );
+      // pass name & symbol thru constructor
+      const contract = await contractFactory.deploy(
+        nftForm.cname,
+        nftForm.symbol
+      );
+      await contract.waitForDeployment();
+      const contractAddress = await contract.getAddress();
+
+      setBanner({
+        color: "green",
+        msg: "Contract created. Minting items... please wait",
+      });
+
+      const nftStorage = new NFTStorage({ token: NFT_STORAGE_API });
+
+      // stringified JSON, will be uploaded to nft storage
+      let nftUrls: Array<string> = [];
+
+      for (let i = 0; i < numberItems; i++) {
+        const store = await nftStorage.store({
+          name: nftForm.itemNames[i],
+          description: nftForm.itemDescs[i],
+          image: nftForm.images[i],
+        });
+
+        nftUrls.push(store.url);
+        console.log("url: " + store.url);
+      }
+
+      const contractConnection = new Contract(
+        contractAddress,
+        AuctionHouseItem.abi,
+        state.signer
+      );
+      await contractConnection.bulkMint(nftUrls);
+
+      console.log(nftUrls);
+
+      setBanner({
+        color: "green",
+        msg: `Minted ${numberItems} items and deployed ERC-721 to address: ${contractAddress}`,
+      });
+    } catch (err) {
+      setBanner({ color: "red", msg: "An error occurred" });
+      console.error(err);
+    }
   };
 
   // item metadata for each minted in an erc-721 contract
   let itemInputs: Array<React.JSX.Element> = [];
-  for (let i = 0; i < items; i++) {
+  for (let i = 0; i < numberItems; i++) {
     itemInputs.push(
       <Grid item xs={8} key={i + 1}>
         <Typography>Item {i + 1}</Typography>
@@ -96,7 +158,15 @@ export default function Mint() {
           />
         </Box>
         <Typography>Image</Typography>
-        <input type="file" />
+        <input
+          type="file"
+          accept="image/*"
+          onChange={(e) => {
+            let arr = nftForm.images;
+            arr[i] = (e.target.files as FileList)[0];
+            setNftForm({ ...nftForm, images: arr });
+          }}
+        />
       </Grid>
     );
   }

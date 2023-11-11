@@ -11,13 +11,20 @@ contract AuctionHouseItem is ERC721, ERC721URIStorage {
 
     constructor(string memory name_, string memory symbol_) ERC721(name_, symbol_) {}
 
-    /// @notice Mint an auction item for sender.
+    /// @notice Mint tokens in bulk
+    /// @param uri Array of URI metadata for minting
+    function bulkMint(string[] memory uri) public {
+        for (uint i = 0; i < uri.length; i++) {
+            safeMint(uri[i]);
+        }
+    }
+
+    /// @notice Mint an item for sender.
     /// @param uri data for the nft
-    function safeMint(string memory uri) public returns (uint256){
+    function safeMint(string memory uri) public {
         uint256 tokenId = _nextTokenId++;
         _safeMint(msg.sender, tokenId);
         _setTokenURI(tokenId, uri);
-        return tokenId;
     }
 
     /// @notice Get the metadata URI for the provided token
