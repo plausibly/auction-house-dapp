@@ -25,11 +25,12 @@ contract AuctionHouse is IERC721Receiver {
 
     struct AuctionItem {
         address seller;
-        address contractId;
+        address contractId; // address to corresponding ERC-721 contract
         uint256 tokenId;
-        uint endTime;
+        uint256 endTime; // end time, seconds since epoch
         uint256 highestBid; // starting price (if no bidder); otherwise its the highest bid
-        address highestBidder;
+        address highestBidder; 
+        bool archived; // wheter the auction has ended and items are claimed
     }
 
 // todo add emits later
@@ -84,23 +85,29 @@ contract AuctionHouse is IERC721Receiver {
     /// @param id auction id
     function claimItems(uint256 id) public {
         AuctionItem memory item = auctions[id];
-        require(item.endTime != 0, "Auction does not exist");
-        require(item.highestBidder != address(0), "No one bid on the item. There is nothing to claim");
-        //TODO time validate
-        //TODO handle expired auction no bids
-        uint houseCut = item.highestBid * (feeBp / 10000);
-        uint sellerCut = item.highestBid - houseCut;
-        collectedFees += houseCut;
+        // bid of 0 indicates the mapping returned nothing
+        require(item.highestBid != 0 && !item.archived, "Auction is not valid");
+        require(item.endTime >= block.timestamp, "Auction is still running");
         IERC721 nfts = IERC721(item.contractId);
-        nfts.transferFrom(address(this), item.highestBidder, item.tokenId);
-        if (sellerCut > 0) {
-            // the house could theoretically have 100% fee
-            coin.transferFrom(address(this), item.seller, sellerCut);
+
+        if (item.highestBidder != address(0)) {
+            nfts.transferFrom(address(this), item.highestBidder, item.tokenId);
+            uint houseCut = item.highestBid * (feeBp / 10000);
+            uint sellerCut = item.highestBid - houseCut;
+            collectedFees += houseCut;
+            if (sellerCut > 0) {
+                // the house could theoretically have 100% fee
+                coin.approve(address(this), sellerCut);
+                coin.transferFrom(address(this), item.seller, sellerCut);
+            }
+        } else {
+            // no bids, refund item
+            nfts.transferFrom(address(this), item.seller, item.tokenId);
         }
 
-        delete(auctions[item.tokenId]);
+        auctions[id].archived = true;
     }
-    
+
     /* Auction Control (Selling) */
 
     /// Create an auction with the provided details. Sends the ERC-721 item to the house for auctioning.
@@ -108,7 +115,7 @@ contract AuctionHouse is IERC721Receiver {
     /// @param tokenId TokenID of the item being auctioned
     /// @param startPrice The starting price for bids
     /// @param endTime The auction end date
-    function createAuction(address contractAddress, uint256 tokenId, uint256 startPrice, uint endTime) public  {
+    function createAuction(address contractAddress, uint256 tokenId, uint256 startPrice, uint256 endTime) public {
         IERC721 nfts = IERC721(contractAddress);
         require(nfts.ownerOf(tokenId) == msg.sender, "Cannot auction item you do not own!");
         require(nfts.getApproved(tokenId) == address(this), "Contract is not approved to transfer NFT");
@@ -118,7 +125,7 @@ contract AuctionHouse is IERC721Receiver {
         nfts.safeTransferFrom(msg.sender, address(this), tokenId);
         uint256 aucId = auctionId;
         auctionId++;
-        auctions[aucId] = AuctionItem(msg.sender, contractAddress, tokenId, endTime, startPrice, address(0));
+        auctions[aucId] = AuctionItem(msg.sender, contractAddress, tokenId, endTime, startPrice, address(0), false);
         emit AuctionCreated(aucId);
     }
 
@@ -128,10 +135,11 @@ contract AuctionHouse is IERC721Receiver {
     function lowerPrice(uint256 id, uint256 newPrice) public {
         AuctionItem storage item = auctions[id];
     
-        require(item.endTime != 0, "Auction does not exist");
+        require(item.highestBid != 0 && !item.archived, "Auction is not valid");
         require(item.seller == msg.sender, "You are not the seller");
         require(newPrice > 0, "Price must be greater than 0");
         require(item.highestBidder == address(0), "Cannot lower price once bids have started");
+        require(item.endTime > block.timestamp, "Cannot lower price once auction has ended");
         require(newPrice < item.highestBid, "New starting price must be lower than current price");
     
         item.highestBid = newPrice;
@@ -141,9 +149,10 @@ contract AuctionHouse is IERC721Receiver {
     /// @param id auction id
     function cancelAuction(uint256 id) public noReentry {
         AuctionItem memory item = auctions[id];
-        require(item.endTime != 0, "Auction does not exist");
+        require(item.highestBid != 0 && !item.archived, "Auction is not valid");
         require(item.seller == msg.sender, "You are not the seller");
-        // TODO END TIME VALIDATION. HOW!!
+        require(item.endTime > block.timestamp, "Cannot cancel auction if it has already ended");
+
         IERC721 nfts = IERC721(item.contractId);
         
         // refund items
@@ -154,7 +163,7 @@ contract AuctionHouse is IERC721Receiver {
             coin.transferFrom(address(this), item.highestBidder, item.highestBid);
         }
 
-        delete(auctions[id]);
+        auctions[id].archived = true;
         emit AuctionCancelled(id);
     }
 
@@ -162,10 +171,10 @@ contract AuctionHouse is IERC721Receiver {
     /// @param id auction id
     function forceEndAuction(uint256 id) public {
         AuctionItem memory item = auctions[id];
-        require(item.endTime != 0, "Auction does not exist");
+        require(item.highestBid != 0 && !item.archived, "Auction is not valid");
         require(item.seller == msg.sender, "You are not the seller");
         require(item.highestBidder != address(0), "No bids have been placed, cannot end. You may cancel the auction instead");
-        // TODO END TIME VALIDATION. HOW!!
+        require(item.endTime > block.timestamp, "Cannot end auction if the time has ended");
         
         uint houseCut = item.highestBid * (feeBp / 10000);
         uint sellerCut = item.highestBid - houseCut;
@@ -178,7 +187,7 @@ contract AuctionHouse is IERC721Receiver {
             coin.transferFrom(address(this), item.seller, sellerCut);
         }
 
-        delete(auctions[id]);
+        auctions[id].archived = true;
         emit AuctionEnded(id);
     }
 
@@ -188,7 +197,8 @@ contract AuctionHouse is IERC721Receiver {
     /// @param bidAmnt amount to bid
     function placeBid(uint256 id, uint256 bidAmnt) noReentry public {
         AuctionItem storage item = auctions[id];
-        require(item.endTime != 0, "Auction does not exist");
+        require(item.highestBid != 0 && !item.archived, "Auction is not valid");
+        require(item.endTime > block.timestamp, "Cannot bid on auction that has ended");
         require(coin.balanceOf(msg.sender) >= bidAmnt, "You do not have enough AUC to place this bid");
         // if there was a previous bid, the new bid should be strictly greater (otherwise highestBid is the startprice)
         require(bidAmnt > item.highestBid || (item.highestBidder == address(0) && bidAmnt >= item.highestBid), "Bid is too low");
