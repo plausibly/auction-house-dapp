@@ -8,10 +8,10 @@ export interface LoginState {
   isLoggedIn: boolean;
 }
 
-/* https://medium.com/@flavtech/how-to-easily-call-smart-contracts-using-ethers-nextjs-dd3dabd43c07 */
 export default function LoginProvider() {
-  const [state, setState] = useState<LoginState>({} as LoginState);
+  const [state, setState] = useState({} as LoginState);
 
+  // Some code cited from https://medium.com/@flavtech/how-to-easily-call-smart-contracts-using-ethers-nextjs-dd3dabd43c07
   const login = useCallback(async () => {
     if (state.isLoggedIn) {
       return;
@@ -23,10 +23,8 @@ export default function LoginProvider() {
       alert("No wallet extension detected!");
       return;
     }
-
     const provider = new ethers.BrowserProvider(ethereum);
-
-    const accounts: string[] = await provider.send("eth_requestAccounts", []);
+    const accounts = await provider.send("eth_requestAccounts", []);
 
     if (accounts.length > 0) {
       const signer = await provider.getSigner();

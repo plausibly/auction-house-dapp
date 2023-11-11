@@ -36,7 +36,7 @@ export default function Header() {
     } else {
       setManager(false);
     }
-  }, [state, coinService, houseService]);
+  }, [state, coinService, houseService, auc]);
 
   return (
     <AppBar position="static" elevation={0}>

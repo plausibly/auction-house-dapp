@@ -34,7 +34,6 @@ export class CoinServiceProvider {
             return;
         }
         const decimals = Number(await this.contract.decimals());
-
-        await this.signed.mintToken(BigInt(amnt * 10 ** decimals));
+        await this.signed.mintToken(BigInt(Math.ceil(amnt * 10 ** decimals)));
     }
 }
