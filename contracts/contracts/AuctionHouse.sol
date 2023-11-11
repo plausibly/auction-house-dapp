@@ -28,7 +28,7 @@ contract AuctionHouse is IERC721Receiver {
         address contractId; // address to corresponding ERC-721 contract
         uint256 tokenId;
         uint256 endTime; // end time, seconds since epoch
-        uint256 highestBid; // starting price (if no bidder); otherwise its the highest bid
+        uint256 highestBid; // starting price (if no bidder); otherwise its the highest bid.
         address highestBidder; 
         bool archived; // wheter the auction has ended and items are claimed
     }
@@ -40,7 +40,18 @@ contract AuctionHouse is IERC721Receiver {
     event BidPlaced(uint256 id, uint256 newBid);
     event ItemClaimed(uint256 id);
     event FeeChanged(uint fee);
-    event PriceLowered(string message);
+    event PriceLowered(uint256 id, uint256 newPrice);
+
+    /// Ensures that an auction exists in the mapping, and is not archived. Optionally,
+    /// can verify if the sender is the seller.
+    /// @param id the auction id for the mapping lookup
+    /// @param enforceSeller whether or not to check if the seller sent the request
+    modifier validAuction(uint256 id, bool enforceSeller) {
+        AuctionItem memory item = auctions[id];
+        require(item.seller != address(0) && !item.archived, "Auction is not valid");
+        require(!enforceSeller || item.seller == msg.sender, "You are not the seller");
+        _;
+    }
 
     modifier onlyAdmin() {
         require(msg.sender == admin, "Insufficient permissions");
@@ -83,29 +94,25 @@ contract AuctionHouse is IERC721Receiver {
     /// Trigger a claim for an auction that has ended. This will send the item to the highest bidder,
     /// and the bid to the seller.
     /// @param id auction id
-    function claimItems(uint256 id) public {
+    function claimItems(uint256 id) validAuction(id, false) noReentry public {
         AuctionItem memory item = auctions[id];
-        // bid of 0 indicates the mapping returned nothing
-        require(item.highestBid != 0 && !item.archived, "Auction is not valid");
-        require(item.endTime >= block.timestamp, "Auction is still running");
+        require(item.endTime <= block.timestamp, "Auction is still running");
+        require(item.highestBidder != address(0), "No bidder on this auction. Nothing to claim");
         IERC721 nfts = IERC721(item.contractId);
 
-        if (item.highestBidder != address(0)) {
-            nfts.transferFrom(address(this), item.highestBidder, item.tokenId);
-            uint houseCut = item.highestBid * (feeBp / 10000);
-            uint sellerCut = item.highestBid - houseCut;
-            collectedFees += houseCut;
-            if (sellerCut > 0) {
-                // the house could theoretically have 100% fee
-                coin.approve(address(this), sellerCut);
-                coin.transferFrom(address(this), item.seller, sellerCut);
-            }
-        } else {
-            // no bids, refund item
-            nfts.transferFrom(address(this), item.seller, item.tokenId);
+        nfts.transferFrom(address(this), item.highestBidder, item.tokenId);
+        uint256 houseCut = calculateHouseCut(item.highestBid);
+        collectedFees += houseCut;
+
+        if (houseCut < item.highestBid) {
+            // the house could theoretically have 100% fee
+            uint256 sellerCut = item.highestBid - houseCut;
+            coin.approve(address(this), sellerCut);
+            coin.transferFrom(address(this), item.seller, sellerCut);
         }
 
         auctions[id].archived = true;
+        emit ItemClaimed(id);
     }
 
     /* Auction Control (Selling) */
@@ -132,26 +139,24 @@ contract AuctionHouse is IERC721Receiver {
     /// Lowers the starting price of an existing auction if bids have not been started.
     /// @param id auction id
     /// @param newPrice the price to lower to
-    function lowerPrice(uint256 id, uint256 newPrice) public {
+    function lowerPrice(uint256 id, uint256 newPrice) validAuction(id, true) public {
         AuctionItem storage item = auctions[id];
-    
-        require(item.highestBid != 0 && !item.archived, "Auction is not valid");
-        require(item.seller == msg.sender, "You are not the seller");
+
         require(newPrice > 0, "Price must be greater than 0");
         require(item.highestBidder == address(0), "Cannot lower price once bids have started");
         require(item.endTime > block.timestamp, "Cannot lower price once auction has ended");
         require(newPrice < item.highestBid, "New starting price must be lower than current price");
     
         item.highestBid = newPrice;
+        emit PriceLowered(id, newPrice);
     }
 
     /// Cancels a running auction. Refunds potential buyer and the seller.
     /// @param id auction id
-    function cancelAuction(uint256 id) public noReentry {
+    function cancelAuction(uint256 id) validAuction(id, true) noReentry public {
         AuctionItem memory item = auctions[id];
-        require(item.highestBid != 0 && !item.archived, "Auction is not valid");
-        require(item.seller == msg.sender, "You are not the seller");
-        require(item.endTime > block.timestamp, "Cannot cancel auction if it has already ended");
+        // cannot cancel auction if time has unded UNLESS there were no bids
+        require(item.endTime > block.timestamp || item.highestBidder == address(0), "Cannot cancel auction if it has already ended");
 
         IERC721 nfts = IERC721(item.contractId);
         
@@ -169,20 +174,19 @@ contract AuctionHouse is IERC721Receiver {
 
     /// Ends a running auction. This will trigger payment to the seller, and item sent to buyer.
     /// @param id auction id
-    function forceEndAuction(uint256 id) public {
+    function forceEndAuction(uint256 id) validAuction(id, true) public {
         AuctionItem memory item = auctions[id];
-        require(item.highestBid != 0 && !item.archived, "Auction is not valid");
-        require(item.seller == msg.sender, "You are not the seller");
         require(item.highestBidder != address(0), "No bids have been placed, cannot end. You may cancel the auction instead");
-        require(item.endTime > block.timestamp, "Cannot end auction if the time has ended");
         
-        uint houseCut = item.highestBid * (feeBp / 10000);
-        uint sellerCut = item.highestBid - houseCut;
-        collectedFees += houseCut;
         IERC721 nfts = IERC721(item.contractId);
         nfts.transferFrom(address(this), item.highestBidder, item.tokenId);
-        if (sellerCut > 0) {
+
+        uint256 houseCut = calculateHouseCut(item.highestBid);
+        collectedFees += houseCut;
+
+        if (houseCut < item.highestBid) {
             // the house could theoretically have 100% fee
+            uint256 sellerCut = item.highestBid - houseCut;
             coin.approve(address(this), sellerCut);
             coin.transferFrom(address(this), item.seller, sellerCut);
         }
@@ -195,11 +199,12 @@ contract AuctionHouse is IERC721Receiver {
     /// The old bidder will be refunded, and the new bid will be sent to the house.
     /// @param id Auction Id
     /// @param bidAmnt amount to bid
-    function placeBid(uint256 id, uint256 bidAmnt) noReentry public {
+    function placeBid(uint256 id, uint256 bidAmnt) validAuction(id, false) noReentry public {
         AuctionItem storage item = auctions[id];
-        require(item.highestBid != 0 && !item.archived, "Auction is not valid");
+
         require(item.endTime > block.timestamp, "Cannot bid on auction that has ended");
         require(coin.balanceOf(msg.sender) >= bidAmnt, "You do not have enough AUC to place this bid");
+
         // if there was a previous bid, the new bid should be strictly greater (otherwise highestBid is the startprice)
         require(bidAmnt > item.highestBid || (item.highestBidder == address(0) && bidAmnt >= item.highestBid), "Bid is too low");
         if (item.highestBidder != address(0)) {
@@ -253,5 +258,11 @@ contract AuctionHouse is IERC721Receiver {
         require(_fee >= 0 && _fee <= 10000, "Fee must be positive and cannot exceed 10,000 BP");
         feeBp = _fee;
         emit FeeChanged(feeBp);
+    }
+
+    /// Helper function to compute the house cut (fees) based on amnt
+    /// @param amnt Amount to apply fee to
+    function calculateHouseCut(uint256 amnt) private view returns(uint256) {
+        return amnt * feeBp / 10000;
     }
 }

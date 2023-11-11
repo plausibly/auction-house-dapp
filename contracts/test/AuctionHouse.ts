@@ -1,7 +1,8 @@
 import { expect } from "chai";
-import { ethers } from "hardhat";
+import { ethers, network } from "hardhat";
 import { AuctionHouse, AuctionHouseCoin, AuctionHouseItem } from "../typechain-types";
 import { AddressLike, ContractRunner } from "ethers";
+import { time } from "@nomicfoundation/hardhat-network-helpers";
 
 describe("General Tests", () => {
     let house: AuctionHouse;
@@ -162,7 +163,6 @@ describe("Auctioning Behaviour", () => {
         for (let i = 0; i < 5; i++) {
             await user1.safeMint("");
             await user1.approve(houseAddress, i);
-
         }
         // user 2 has id 5,..,9
         for (let i = 5; i < 10; i++) {
@@ -301,15 +301,13 @@ describe("Auctioning Behaviour", () => {
         // nft sent to buyer
         expect(await nft.ownerOf(0)).to.equal(auctionData.highestBidder);
 
-        // bid sent to seller (minus fee) TODO fix
-        const fee = await house.feeBp();
+        // convert to Number and perform calculations
+        const bid = Number(auctionData.highestBid);
+        const houseCut = 0.025 * bid; // fee is 2.5% by default
+        const sellerCut = bid - houseCut;
 
-        // const bidMinusFee = BigInt(Number(auctionData.highestBid) * (1 - 0.025));
-
-        // expect(await coin.balanceOf(auctionData.seller)).to.equal(auctionData.highestBid);
-
-        // expect(await house.collectedFees()).to.not.equal(0);
-
+        expect(await coin.balanceOf(auctionData.seller)).to.equal(BigInt(sellerCut));
+        expect(await house.collectedFees()).to.equal(BigInt(houseCut));
     });
 
     it("Should be able to cancel auction", async () => {
@@ -321,26 +319,55 @@ describe("Auctioning Behaviour", () => {
 
         const endTime = Math.floor(new Date("January 01, 3029").getTime() /  1000);
 
-        await hUser1.createAuction(nftAddress, 1, 999, endTime); // auction id = 1
-        await hUser1.createAuction(nftAddress, 2, 999, endTime); // auction id = 2
+        await expect(hUser1.createAuction(nftAddress, 1, 999, endTime)).to.emit(hUser1, "AuctionCreated").withArgs(1); // auction id = 1
+        const auc2 = await hUser1.createAuction(nftAddress, 2, 999, endTime); // auction id = 2
+
+        expect((await hUser1.auctions(1)).archived).to.be.false;
+        expect((await hUser1.auctions(2)).archived).to.be.false;
 
         expect(await nft.ownerOf(1)).to.equal(houseAddress);
         expect(await nft.ownerOf(2)).to.equal(houseAddress);
 
         await expect(hUser1.cancelAuction(1)).to.emit(hUser1, "AuctionCancelled").withArgs(1);
         expect(await nft.ownerOf(1)).to.equal(await addr.getAddress());
+        expect((await hUser1.auctions(1)).archived).to.be.true; // ended auctions are marked as archive
+
+        // setup coins for bidding
+        const bidAmt = BigInt(9 * 10**18);
+        await coin.mintToken(bidAmt);
+        await coin.approve(houseAddress, bidAmt);
+        const oldBal = await coin.balanceOf(adminAddress);
+
+        // cannot bid on cancelled auction
+        await expect(house.placeBid(1, bidAmt)).to.be.revertedWith("Auction is not valid");
 
         // place bid on auction id 2 before its cancelled
-        const bidAmt = BigInt(9 * 10**18);
-        const oldBal = await coin.balanceOf(adminAddress);
-        coin.mintToken(bidAmt);
-        coin.approve(houseAddress, bidAmt);
-        await house.placeBid(1, bidAmt);
+        await expect(house.placeBid(2, bidAmt)).to.not.be.reverted;
+
         expect(await coin.balanceOf(adminAddress)).to.equal(BigInt(bidAmt - oldBal));
 
         await expect(hUser1.cancelAuction(2)).to.emit(hUser1, "AuctionCancelled").withArgs(2);
+        expect((await hUser1.auctions(2)).archived).to.be.true; // ended auctions are marked as archive
+
+    
         expect(await nft.ownerOf(2)).to.equal(await addr.getAddress());
         expect(await coin.balanceOf(adminAddress)).to.equal(oldBal);
+    });
+
+    it("Managers can collect fees", async () => {
+        const [admin] = await ethers.getSigners();
+        const adminAddr = await admin.getAddress();
+        const houseAddr = await house.getAddress();
+
+        const oldAdminBal = await coin.balanceOf(adminAddr);
+        const oldHouseBal = await coin.balanceOf(houseAddr);
+
+        const fees = await house.collectedFees();
+
+        expect(await house.withdrawFees(fees)).to.not.be.reverted;
+
+        expect(await coin.balanceOf(houseAddr)).to.equal(oldHouseBal - fees);
+        expect(await coin.balanceOf(adminAddr)).to.equal(oldAdminBal + fees);
     });
 
     it("Should be able to lower auction price", async () => {
@@ -348,16 +375,72 @@ describe("Auctioning Behaviour", () => {
         const hUser1 = house.connect(addr);
         const nftAddress = await nft.getAddress();
         
-        await hUser1.createAuction(nftAddress, 1, BigInt(1 * 10**18), Date.now() + 99999999); // auction id = 3
+        await hUser1.createAuction(nftAddress, 4, BigInt(1 * 10**18), Date.now() + 99999999); // auction id = 3
 
         const newPrice = BigInt(0.5 * 10**18);
-        await expect(hUser1.lowerPrice(1, newPrice)).to.not.be.reverted;
+        await expect(hUser1.lowerPrice(3, newPrice)).to.not.be.reverted;
 
         const aucData = await hUser1.auctions(3);
         expect(aucData.highestBid).to.equal(newPrice);
     });
 
-    it("Should be able to claim items after an auction has ended", async () => {
+    it("Should be able to cancel auction that has no bids and time ran out", async () => {
+        let aucData = await house.auctions(3);
+        const [admin, addr] = await ethers.getSigners();
+        expect(aucData.archived).to.be.false;
 
+        // force the time to reach the end
+        await ethers.provider.send("evm_mine", [Number(aucData.endTime)]);
+
+        await expect(house.claimItems(3)).to.be.revertedWith("No bidder on this auction. Nothing to claim");
+        await expect(house.forceEndAuction(3)).to.be.revertedWith("You are not the seller");
+
+        const hUser1 = house.connect(addr);
+        await expect(hUser1.forceEndAuction(3)).to.be.revertedWith("No bids have been placed, cannot end. You may cancel the auction instead");
+
+        await expect(hUser1.cancelAuction(3)).to.emit(hUser1, "AuctionCancelled").withArgs(3);
+
+        // nft refunded, auction marked as archive
+        expect(await nft.ownerOf(aucData.tokenId)).to.equal(await addr.getAddress());
+        aucData = await house.auctions(3);
+        expect(aucData.archived).to.be.true;
+    });
+
+    it("Should be able to claim items after an auction has ended", async () => {
+        const [admin, addr] = await ethers.getSigners();
+        const nftUser1 = nft.connect(addr);
+        const hUser1 = house.connect(addr);
+
+        // approve item 1 again, it has been auctioned and returned in the past
+        await nftUser1.approve(await house.getAddress(), 1);
+
+        await hUser1.createAuction(await nft.getAddress(), 1, 9, Date.now() + 99999999);
+
+        const sellerAddr = addr.getAddress();
+
+        const sellerBal = await coin.balanceOf(sellerAddr);
+        const bidAmt = BigInt(0.2 * 10**18);
+
+        // admin will bid on auction
+        await coin.approve(await house.getAddress(), bidAmt);
+        await house.placeBid(4, bidAmt);
+
+        let aucData = await house.auctions(4);
+        
+        // force the time to reach the end
+        await ethers.provider.send("evm_mine", [Number(aucData.endTime)]);
+
+        await expect(house.claimItems(4)).to.emit(house, "ItemClaimed").withArgs(4);
+        aucData = await house.auctions(4);
+        expect(aucData.archived).to.be.true;
+
+        const bid = Number(aucData.highestBid);
+        const houseCut = 0.025 * Number(aucData.highestBid);
+        const sellerCut = bid - houseCut;
+
+        // ensure items were transferred
+        expect(await nft.ownerOf(1)).to.equal(await admin.getAddress());
+        expect(await coin.balanceOf(sellerAddr)).to.equal(sellerBal + BigInt(sellerCut));
+        expect(await coin.balanceOf(await house.getAddress())).to.equal(BigInt(houseCut));
     });
 });
