@@ -5,7 +5,7 @@ pragma solidity >=0.4.22 <0.9.0;
 import "contracts/AuctionHouseCoin.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 
-/// @title Auction House.
+/// @title Auction House
 /// @author plausibly
 /// @notice Contains functionality to auction and bid on ERC-721 digital items
 contract AuctionHouse {

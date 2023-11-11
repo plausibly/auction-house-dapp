@@ -171,8 +171,8 @@ describe("Auctioning Behaviour", () => {
         }
         
         // verify setup worked
-        expect(await user1.myBalance()).to.equal(5);
-        expect(await user2.myBalance()).to.equal(5);
+        expect(await nft.balanceOf(await addr.getAddress())).to.equal(5);
+        expect(await nft.balanceOf(await addr2.getAddress())).to.equal(5);
     });
 
     it("Should not be able to create auction for invalid items", async () => {
@@ -192,7 +192,7 @@ describe("Auctioning Behaviour", () => {
 
         const hUser1 = house.connect(addr);
         const nftUser1 = nft.connect(addr);
-        const itemsOwned = await nftUser1.myBalance();
+        const itemsOwned = await nft.balanceOf(await addr.getAddress());
         const startPrice = BigInt(0.005 * 10**18);
         const endTime = Math.floor(new Date("January 01, 3053").getTime() /  1000); // epoch
 
@@ -200,7 +200,7 @@ describe("Auctioning Behaviour", () => {
         .emit(hUser1, "AuctionCreated").withArgs(0);
 
         // item sent to house, no longer owned by user
-        expect(await nftUser1.myBalance()).to.be.equal(itemsOwned - BigInt(1));
+        expect(await nft.balanceOf(await addr.getAddress())).to.be.equal(itemsOwned - BigInt(1));
         expect(await nft.balanceOf(house.getAddress())).to.be.equal(BigInt(1));
 
         const auctionData = await house.auctions(0);
@@ -266,7 +266,7 @@ describe("Auctioning Behaviour", () => {
         
         // match the previous bid (should be rejected)
         await expect(user3.placeBid(0, bidAmt)).to.be.rejectedWith("Bid is too low");
-        expect(await user3Coin.myBalance()).to.equal(mintedAmtUser3);
+        expect(await coin.balanceOf(await addr3.getAddress())).to.equal(mintedAmtUser3);
         // auction remains unchanged
         aucData = await house.auctions(0);
         expect(aucData.highestBidder).to.equal(await addr2.getAddress());
@@ -274,8 +274,8 @@ describe("Auctioning Behaviour", () => {
         // place larger bid
         await expect(user3.placeBid(0, mintedAmtUser3)).to.emit(user3, "BidPlaced").withArgs(0, mintedAmtUser3);
         // refund old bidder, take new higher bid
-        expect(await user3Coin.myBalance()).to.equal(0);
-        expect(await user2Coin.myBalance()).to.equal(mintedAmtUser2);
+        expect(await coin.balanceOf(await addr3.getAddress())).to.equal(0);
+        expect(await coin.balanceOf(await addr2.getAddress())).to.equal(mintedAmtUser2);
 
         // auction reflects new bidder
         aucData = await house.auctions(0);
