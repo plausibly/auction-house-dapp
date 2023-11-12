@@ -25,4 +25,25 @@ export class ItemServiceProvider {
         }
         return await this.signed.bulkMint(uris);
     }
+
+    async isOwner(tokenId: number) {
+        const tokenOwner = ethers.getAddress(await this.contract.ownerOf(BigInt(tokenId)));
+        return tokenOwner === ethers.getAddress(this.address);
+    }
+
+    async getMetadataUri(id: BigInt) {
+        if (!this.signed) {
+            return;
+        }
+
+        return await this.signed.tokenURI(id);
+    }
+
+    async approve(tokenId: number, address: string) {
+        if (!this.signed) {
+            return;
+        }
+
+        return await this.signed.approve(address, BigInt(tokenId));
+    }
 }

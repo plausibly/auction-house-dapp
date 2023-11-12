@@ -16,14 +16,6 @@ export interface AuctionItem {
 };
 
 /**
- * Metadata for a specific ERC-721 token
- */
-export interface ItemMetadata {
-    name: string,
-    description: string
-};
-
-/**
  * Service class with functionality to communicate with the auction house contract.
  */
 export class HouseServiceProvider {
@@ -47,14 +39,37 @@ export class HouseServiceProvider {
         return this.signed;
     }
 
+    async getAuctionObject(id: number) {
+        if (!this.signed) {
+            return;
+        }
+        const obj = await this.signed.auctions(BigInt(id));
+        const formattedObj: AuctionItem = {
+            seller: obj[0],
+            contractId: obj[1],
+            tokenId: obj[2],
+            endTime: new Date(Number(obj[3]) * 1000),
+            highestBid: obj[4],
+            highestBidder: obj[5],
+            archived: Boolean(obj[6])
+        }
+
+        return formattedObj;
+    }
+
+    async listenAuctions() {
+        this.contract.on("AuctionCreated", (id) => {
+            console.log(id);
+        })
+    }
+
     async createAuction(address: string, tokenId: number, price: number, endDate: Date) {
         if (!this.signed) {
             return;
         }
 
         //TODO APPROVE NFT... ALSO APPROVALS ON ALL OTHER FUNCS
-
-        const formatPrice = BigInt(price * 10 ** 18);
+        const formatPrice = BigInt(Math.ceil(price * 10 ** 18));
         const end = Math.floor(endDate.getTime() / 1000); // epoch time
 
         return await this.signed.createAuction(address, tokenId, formatPrice, end);

@@ -3,22 +3,27 @@ import Header from "@/components/Header";
 import { Box, Button, Grid, Link, TextField, Typography } from "@mui/material";
 import FallbackImage from "../../../public/question_mark.png";
 import Image from "next/image";
-import { useEffect, useState } from "react";
-import { AuctionItem, ItemMetadata } from "@/services/house";
+import { useEffect, useMemo, useState } from "react";
+import { AuctionItem, HouseServiceProvider } from "@/services/house";
 import { useLoginContext } from "@/contexts/LoginContextProvider";
 import { ethers } from "ethers";
+import { useSearchParams } from "next/navigation";
+import { notFound } from "next/navigation";
+import { ItemServiceProvider } from "@/services/item";
 
 export default function Item() {
+  const itemId = useSearchParams().get("id");
+
   const state = useLoginContext().state;
 
   const [itemData, setItemData] = useState<AuctionItem>({
-    seller: "0x0",
-    contractId: "0x63D7245276Fb3162fbD2089B40CF6681721111ec",
-    tokenId: BigInt(53),
+    // error placeholder
+    seller: "",
+    contractId: "",
+    tokenId: BigInt(0),
     endTime: new Date(0),
-    highestBid: BigInt(99),
-    highestBidder:
-      "0xef299f003732c0d6927f30aa9335d45ffbde0441afe94e00f589c6a9de2d0a3f",
+    highestBid: BigInt(0),
+    highestBidder:"",
     archived: false,
   });
 
@@ -26,29 +31,40 @@ export default function Item() {
   const [isRunning, setIsRunning] = useState(false);
   const [isArchived, setisArchived] = useState(false);
   const [bidAmt, setBidAmt] = useState(0);
-  const [metadataUri, setMetadataUri] = useState("");
+  const [name, setName] = useState("");
+  const [desc, setDesc] = useState("");
+  const [imgSrc, setImgSrc] = useState(FallbackImage.src);
   const [isSeller, setIsSeller] = useState(false);
-
-  const [itemMetadata, setMetadata] = useState<ItemMetadata>({
-    name: "placeholder",
-    description: "placeholder desc",
-  });
 
   const etherscanUrl = "https://sepolia.etherscan.io/address/";
   const zeroAddress = "0x0000000000000000000000000000000000000000";
 
-  //todo force refresh on event
+  const houseProvider = useMemo(() => new HouseServiceProvider(state.address, state.provider, state.signer), [state.address, state.provider, state.signer]);
 
   useEffect(() => {
-    setHasBidder(itemData.highestBidder !== zeroAddress);
-    setIsSeller(ethers.getAddress(itemData.seller) === ethers.getAddress(state.address));
-    // Mark as ended if date elapsed
-    setIsRunning(itemData.endTime.getTime() > Date.now());
+    if (itemId == null || itemId == undefined) {
+      return;
+    }
+    const data = houseProvider.getAuctionObject(Number(itemId)).then(d => {
+      if (d && ethers.isAddress(d.contractId)) {
+        setItemData(d);
+        setHasBidder(itemData.highestBidder !== zeroAddress);
+        // setIsSeller(ethers.getAddress(itemData.seller) === ethers.getAddress(state.address));
+        // Mark as ended if date elapsed
+        setIsRunning(itemData.endTime.getTime() > Date.now());
+    
+        // Archived if: 1) item claimed, 2) auction force ended/cancel by seller
+        setisArchived(itemData.archived);
 
-    // Archived if: 1) item claimed, 2) auction force ended/cancel by seller
-    setisArchived(itemData.archived);
+        const itemProvider = new ItemServiceProvider(d.contractId, state.address, state.provider, state.signer);
+      }
+    });
+  }, [itemData, state, houseProvider, itemId]);
 
-  }, [itemData, state.address]);
+  if (!state.isLoggedIn || itemId === null || itemId === undefined || itemData.seller === zeroAddress) {
+    // 404 if the item id is not provided, or the auction data is 0x0
+    return notFound(); 
+  }
 
   return (
     <div>
@@ -71,14 +87,14 @@ export default function Item() {
         </Grid>
         <Grid item xs={12} md={4} sx={{ pt: 4 }}>
           <Typography variant="h4" sx={{ pb: 2 }}>
-            Name: {itemMetadata.name}
+            Name: {name}
           </Typography>
           <Typography sx={{ pb: 2 }}>
             Highest Bidder: {hasBidder ? itemData.highestBidder : "N/A"}
           </Typography>
           <Typography>
             {hasBidder ? "Highest Bid: " : "Starting Price: "}
-            {itemData.highestBid.toString()}
+            { (Number(itemData.highestBid) / 10**18).toString()}
           </Typography>
 
           {isRunning ? (
@@ -130,12 +146,12 @@ export default function Item() {
         </Grid>
         <Grid item xs={12} sx={{ pt: 4, pl: 4 }}>
           <Typography sx={{ pb: 2 }}>
-            Description: {itemMetadata.description}
+            Description: {desc}
           </Typography>
 
           <Typography sx={{ pb: 2 }}>Seller: {itemData.seller}</Typography>
           <Typography sx={{ pb: 2 }}>
-            Contract ID:
+            Contract ID: {" "}
             {
               <Link target="_blank" href={etherscanUrl + itemData.contractId}>
                 {itemData.contractId}

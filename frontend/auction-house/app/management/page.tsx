@@ -9,7 +9,7 @@ import { HouseServiceProvider } from "../../services/house";
 import { ethers } from "ethers";
 
 export default function Management() {
-  const { login, logout, state } = useLoginContext();
+  const state = useLoginContext().state;
 
   const [adminAddress, setAdminAddress] = useState("");
   const [adminBalance, setAdminBal] = useState(0);
@@ -21,6 +21,7 @@ export default function Management() {
   const [mgrInput, setMgrInput] = useState("");
   const [withdrawInput, setWithdrawInput] = useState(0);
   const [adminAddrInput, setAdmAddrInput] = useState("");
+  const [isLogin, setLog] = useState(true);
 
   const houseService = useMemo(
     () => new HouseServiceProvider(state.address, state.provider, state.signer),
@@ -28,6 +29,7 @@ export default function Management() {
   );
 
   useEffect(() => {
+
     if (state.isLoggedIn) {
       houseService
         .getContract()
@@ -40,11 +42,11 @@ export default function Management() {
       houseService.isManager().then((f) => setIsManager(f));
 
       houseService.getFee().then((f) => setFeeText(f.toString()));
-    }
+    } 
   }, [state, houseService, isManager, currFee]);
 
-  if (!isManager) {
-    return notFound();
+  if (!isManager || !state.isLoggedIn) {
+    return <><Header /><Typography>Unauthorized </Typography></>;
   }
 
   return (
