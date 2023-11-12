@@ -6,8 +6,6 @@ import Header from "../../components/Header";
 import { useLoginContext } from "@/contexts/LoginContextProvider";
 import { CoinServiceProvider } from "../../services/coin";
 import { NFTStorage, File } from "nft.storage";
-import { NFT_STORAGE_API } from "@/_env";
-import { Contract, ethers } from "ethers";
 import { ContractFactory } from "ethers";
 import AuctionHouseItem from "../../../../contracts/artifacts/contracts/AuctionHouseItem.sol/AuctionHouseItem.json";
 import { ItemServiceProvider } from "@/services/item";
@@ -76,6 +74,14 @@ export default function Mint() {
       }
     }
 
+    if (!process.env.NEXT_PUBLIC_NFT_STORAGE_API) {
+      setBanner({
+        color: "red",
+        msg: `Missing or invalid API key for NFT.storage`,
+      });
+      return;
+    }
+
     try {
       setBanner({
         color: "green",
@@ -100,7 +106,7 @@ export default function Mint() {
         msg: "Contract created. Minting items... please wait",
       });
 
-      const nftStorage = new NFTStorage({ token: NFT_STORAGE_API });
+      const nftStorage = new NFTStorage({ token: process.env.NEXT_PUBLIC_NFT_STORAGE_API });
 
       // stringified JSON, will be uploaded to nft storage
       let nftUrls: Array<string> = [];

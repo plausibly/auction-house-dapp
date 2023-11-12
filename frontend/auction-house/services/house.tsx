@@ -3,6 +3,26 @@ import AuctionHouse from "../../../contracts/artifacts/contracts/AuctionHouse.so
 import { AuctionHouseContract } from "@/contract-details";
 import { BigNumberish } from "ethers";
 
+
+/** Underlying type for an Auction Item in the smart contract */
+export interface AuctionItem {
+    seller: string,
+    contractId: string,
+    tokenId: BigInt,
+    endTime: Date, // TODO convert *1000
+    highestBid: BigInt,
+    highestBidder: string,
+    archived: boolean
+};
+
+/**
+ * Metadata for a specific ERC-721 token
+ */
+export interface ItemMetadata {
+    name: string,
+    description: string
+};
+
 /**
  * Service class with functionality to communicate with the auction house contract.
  */
