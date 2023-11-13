@@ -10,6 +10,11 @@ import { ethers } from "ethers";
 import { useSearchParams } from "next/navigation";
 import { notFound } from "next/navigation";
 import { ItemServiceProvider } from "@/services/item";
+import { CoinServiceProvider } from "@/services/coin";
+
+function normalizeBid(val: BigInt) {
+  return Number(val) / 10 ** 18;
+}
 
 export default function Item() {
   const itemId = useSearchParams().get("id");
@@ -23,7 +28,7 @@ export default function Item() {
     tokenId: BigInt(0),
     endTime: new Date(0),
     highestBid: BigInt(0),
-    highestBidder:"",
+    highestBidder: "",
     archived: false,
   });
 
@@ -31,39 +36,184 @@ export default function Item() {
   const [isRunning, setIsRunning] = useState(false);
   const [isArchived, setisArchived] = useState(false);
   const [bidAmt, setBidAmt] = useState(0);
+  const [isSeller, setIsSeller] = useState(false);
+
+
   const [name, setName] = useState("");
   const [desc, setDesc] = useState("");
   const [imgSrc, setImgSrc] = useState(FallbackImage.src);
-  const [isSeller, setIsSeller] = useState(false);
+
+  const [banner, setBanner] = useState("");
 
   const etherscanUrl = "https://sepolia.etherscan.io/address/";
   const zeroAddress = "0x0000000000000000000000000000000000000000";
 
-  const houseProvider = useMemo(() => new HouseServiceProvider(state.address, state.provider, state.signer), [state.address, state.provider, state.signer]);
+  const houseProvider = useMemo(
+    () => new HouseServiceProvider(state.address, state.provider, state.signer),
+    [state.address, state.provider, state.signer]
+  );
+  const coinProvider = useMemo(
+    () => new CoinServiceProvider(state.address, state.provider, state.signer),
+    [state.address, state.provider, state.signer]
+  );
 
   useEffect(() => {
     if (itemId == null || itemId == undefined) {
       return;
     }
-    const data = houseProvider.getAuctionObject(Number(itemId)).then(d => {
-      if (d && ethers.isAddress(d.contractId)) {
-        setItemData(d);
-        setHasBidder(itemData.highestBidder !== zeroAddress);
-        // setIsSeller(ethers.getAddress(itemData.seller) === ethers.getAddress(state.address));
-        // Mark as ended if date elapsed
-        setIsRunning(itemData.endTime.getTime() > Date.now());
-    
-        // Archived if: 1) item claimed, 2) auction force ended/cancel by seller
-        setisArchived(itemData.archived);
 
-        const itemProvider = new ItemServiceProvider(d.contractId, state.address, state.provider, state.signer);
-      }
-    });
+    try {
+      const data = houseProvider.getAuctionObject(Number(itemId)).then((d) => {
+        if (d && ethers.isAddress(d.contractId)) {
+          setItemData(d);
+          setHasBidder(itemData.highestBidder !== zeroAddress);
+
+          if (ethers.isAddress(itemData.seller)) {
+            setIsSeller(
+              ethers.getAddress(itemData.seller) ===
+                ethers.getAddress(state.address)
+            );
+          }
+          // Mark as ended if date elapsed
+          setIsRunning(!itemData.archived && itemData.endTime.getTime() > Date.now());
+
+          // Archived if: 1) item claimed, 2) auction force ended/cancel by seller
+          setisArchived(itemData.archived);
+
+          const itemProvider = new ItemServiceProvider(
+            d.contractId,
+            state.address,
+            state.provider,
+            state.signer
+          );
+        }
+      });
+
+    } catch (err) {
+      console.log(err);
+    }
   }, [itemData, state, houseProvider, itemId]);
 
-  if (!state.isLoggedIn || itemId === null || itemId === undefined || itemData.seller === zeroAddress) {
-    // 404 if the item id is not provided, or the auction data is 0x0
-    return notFound(); 
+  const cancelAuction = async () => {
+    try {
+      setBanner("Sending cancellation request...");
+      await houseProvider.cancelAuction(Number(itemId));
+      setBanner("Cancellation request has been sent, pending confirmation.");
+    } catch (err:any) {
+      if (err.data) {
+        const errDecode = houseProvider
+          .getContract()
+          .interface.parseError(err.data);
+        setBanner("An error occurred: " + errDecode?.args);
+      } else {
+        setBanner("An error occurred. ");
+      }
+      console.error(err);
+      return;
+    }
+  }
+
+  const endAuction = async () => {
+    try {
+      setBanner("Sending request to end auction...");
+      await houseProvider.cancelAuction(Number(itemId));
+      setBanner("Request has been sent, pending confirmation.");
+    } catch (err:any) {
+      if (err.data) {
+        const errDecode = houseProvider
+          .getContract()
+          .interface.parseError(err.data);
+        setBanner("An error occurred: " + errDecode?.args);
+      } else {
+        setBanner("An error occurred. ");
+      }
+      console.error(err);
+      return;
+    }
+  }
+
+  const claimItems = async () => {
+    try {
+      setBanner("Sending request to claim items...");
+      await houseProvider.cancelAuction(Number(itemId));
+      setBanner("Request has been sent. Transfers will complete after transaction is confirmed.");
+    } catch (err:any) {
+      if (err.data) {
+        const errDecode = houseProvider
+          .getContract()
+          .interface.parseError(err.data);
+        setBanner("An error occurred: " + errDecode?.args);
+      } else {
+        setBanner("An error occurred. ");
+      }
+      console.error(err);
+      return;
+    }
+  }
+
+  const handleBid = async () => {
+    const highestBid = normalizeBid(itemData.highestBid);
+
+    if (itemData.highestBidder === zeroAddress && bidAmt < highestBid) {
+      setBanner("Bid cannot be less than starting price");
+      return;
+    }
+
+    if (itemData.highestBidder !== zeroAddress && bidAmt <= highestBid) {
+      setBanner("Bid must be greater than the current bid");
+      return;
+    }
+
+    setBanner("Processing bid... Please approve the house to transfer AUC.");
+
+    try {
+      await coinProvider.approve(
+        bidAmt,
+        await houseProvider.getContract().getAddress()
+      );
+    } catch (err: any) {
+      if (err.data) {
+        const errDecode = coinProvider
+          .getContract()
+          .interface.parseError(err.data);
+        setBanner("An error occurred: " + errDecode?.args);
+      } else {
+        setBanner("An error occurred. ");
+      }
+      console.error(err);
+      return;
+    }
+
+    setBanner("Processing bid... please approve the transfer");
+
+    try {
+      setBanner("Bid is processing..");
+      await houseProvider.placeBid(Number(itemId), bidAmt);
+    } catch (err: any) {
+      if (err.data) {
+        const errDecode = houseProvider
+          .getContract()
+          .interface.parseError(err.data);
+        setBanner("An error occurred: " + errDecode?.args);
+      }
+      console.error(err);
+      return;
+    }
+    setBanner("Bid sent. Auction will be updated upon transaction confirmation.");
+  };
+
+  if (
+    !state.isLoggedIn ||
+    itemId === null ||
+    itemId === undefined ||
+    itemData.seller === zeroAddress
+  ) {
+    return (
+      <>
+        <Header />
+        <Typography>Auction does not exist.</Typography>
+      </>
+    );
   }
 
   return (
@@ -94,7 +244,10 @@ export default function Item() {
           </Typography>
           <Typography>
             {hasBidder ? "Highest Bid: " : "Starting Price: "}
-            { (Number(itemData.highestBid) / 10**18).toString()}
+            {normalizeBid(itemData.highestBid)}
+          </Typography>
+          <Typography color="red" sx={{ pt: 2 }}>
+            {banner}
           </Typography>
 
           {isRunning ? (
@@ -112,46 +265,57 @@ export default function Item() {
                 onChange={(e) => setBidAmt(Number(e.target.value))}
                 sx={{ pr: 1 }}
               />
-              <Button variant="contained">Bid</Button>
+              <Button variant="contained" onClick={handleBid}>
+                Bid
+              </Button>
             </Box>
-          ) : (<>
-            <Typography color="red" variant="h5" sx={{ pt: 2 }}>
-              This auction has ended.
-            </Typography>
-            {
-                !isArchived ? <Button variant="contained">Claim Items</Button>  : <></>
-            }</>
-
+          ) : (
+            <>
+              <Typography color="red" variant="h5" sx={{ pt: 2 }}>
+                Auction has ended. {" "}
+                {!isArchived && hasBidder ? "The bidder may claim items." : ""}
+                {isArchived ? "Items have been transferred to the rightful owner(s)." : ""}
+              </Typography>
+              {!isArchived ? (
+                <Button variant="contained" onClick={claimItems}>Claim Items</Button>
+              ) : (
+                <></>
+              )}
+            </>
           )}
 
           {/* Seller Only */}
-          {
-            !isArchived && isSeller ?          
+          {!isArchived && isSeller ? (
             <Box sx={{ pt: 5 }}>
-            <Typography variant="h5">Seller Management:</Typography>
-            <Typography variant="caption">
-              Cancelling the auction will not honor bids, items are refunded.
-              Ending the auction will sell to the current highest bidder.
-            </Typography>
+              <Typography variant="h5">Seller Management:</Typography>
+              <Typography variant="caption">
+                Cancelling the auction will not honor bids, items are refunded.
+                Ending the auction will sell to the current highest bidder. 
+              </Typography>
 
-            <Box>
-              <Button disabled={!isRunning} sx={{ m: 2 }} color="error" variant="contained">
-                Cancel Auction
-              </Button>
-              <Button variant="contained">End Auction</Button>
+              <Box>
+                <Button
+                  disabled={!isRunning}
+                  sx={{ m: 2 }}
+                  color="error"
+                  variant="contained"
+                  onClick={cancelAuction}
+                >
+                  Cancel Auction
+                </Button>
+                <Button variant="contained" onClick={endAuction}>End Auction</Button>
+              </Box>
             </Box>
-          </Box> : <></>
-          }
-
+          ) : (
+            <></>
+          )}
         </Grid>
         <Grid item xs={12} sx={{ pt: 4, pl: 4 }}>
-          <Typography sx={{ pb: 2 }}>
-            Description: {desc}
-          </Typography>
+          <Typography sx={{ pb: 2 }}>Description: {desc}</Typography>
 
           <Typography sx={{ pb: 2 }}>Seller: {itemData.seller}</Typography>
           <Typography sx={{ pb: 2 }}>
-            Contract ID: {" "}
+            Contract ID:{" "}
             {
               <Link target="_blank" href={etherscanUrl + itemData.contractId}>
                 {itemData.contractId}

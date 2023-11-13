@@ -4,7 +4,7 @@ import { Grid } from "@mui/material";
 
 import Typography from "@mui/material/Typography";
 import Header from "../components/Header";
-import LoginProvider, { LoginState } from "@/components/LoginProvider";
+import LoginProvider from "@/components/LoginProvider";
 
 export default function Home() {
   const state = LoginProvider().state;
@@ -26,7 +26,7 @@ export default function Home() {
             Welcome to the totally inconspicious auction house!
           </Typography>
           <Typography variant="caption">
-            This is not a money laundering front.{" "}
+            This is not a money laundering front. 
           </Typography>
         </Grid>
 

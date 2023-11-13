@@ -63,6 +63,16 @@ export default function Mint() {
 
   const [banner, setBanner] = useState({ color: "white", msg: "" });
 
+  const mintHandler = async () => {
+    try {
+      await coinService.mintAUC(toMint);
+      setBanner({color:"white", msg:""});
+    } catch (err) {
+      setBanner({color: "red", msg: "Error occurred minting AUC"});
+      console.error(err);
+    }
+  }
+
   const formHandler = async () => {
     for (let i of nftForm.images) {
       if (!i) {
@@ -285,7 +295,8 @@ export default function Mint() {
             onChange={(e) => setMintAmnt(Number(e.target.value))}
           />
           <Button
-            onClick={() => coinService.mintAUC(toMint)}
+            onClick={mintHandler}
+            disabled={toMint <= 0}
             sx={{ ml: 1 }}
             variant="outlined"
           >

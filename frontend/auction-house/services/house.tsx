@@ -1,8 +1,5 @@
 import { JsonRpcSigner, ethers } from "ethers";
 import AuctionHouse from "../../../contracts/artifacts/contracts/AuctionHouse.sol/AuctionHouse.json";
-import { AuctionHouseContract } from "@/contract-details";
-import { BigNumberish } from "ethers";
-
 
 /** Underlying type for an Auction Item in the smart contract */
 export interface AuctionItem {
@@ -24,10 +21,13 @@ export class HouseServiceProvider {
     address: string;
 
     constructor(address: string, provider: ethers.BrowserProvider, signer?: JsonRpcSigner) {
+        if (!process.env.NEXT_PUBLIC_HOUSE_CONTRACT) {
+            throw new Error("Missing house contract env variable");
+        }
         this.address = address;
-        this.contract = new ethers.Contract(AuctionHouseContract, AuctionHouse.abi, provider);
+        this.contract = new ethers.Contract(process.env.NEXT_PUBLIC_HOUSE_CONTRACT, AuctionHouse.abi, provider);
         if (signer) {
-            this.signed = new ethers.Contract(AuctionHouseContract, AuctionHouse.abi, signer);
+            this.signed = new ethers.Contract(process.env.NEXT_PUBLIC_HOUSE_CONTRACT, AuctionHouse.abi, signer);
         }
     }
 
@@ -37,6 +37,14 @@ export class HouseServiceProvider {
 
     getSigned() {
         return this.signed;
+    }
+
+    async queryFilter(event: string) {
+        if (!this.contract) {
+            return;
+        }
+
+        return await this.contract.queryFilter(event);
     }
 
     async getAuctionObject(id: number) {
@@ -63,12 +71,41 @@ export class HouseServiceProvider {
         })
     }
 
+    async placeBid(auctionId: number, bidAmt: number) {
+        if (!this.signed) {
+            return;
+        }
+        const formatPrice = BigInt(Math.ceil(bidAmt * 10 ** 18));
+        return await this.signed.placeBid(auctionId, formatPrice);
+    }
+
+
+    async claimItems(auctionId: number) {
+        if (!this.signed) {
+            return;
+        }
+        return await this.signed.claimItems(BigInt(auctionId));
+    }
+
+    async cancelAuction(auctionId: number) {
+        if (!this.signed) {
+            return;
+        }
+        return await this.signed.cancelAuction(BigInt(auctionId));
+    }
+
+    async endAuction(auctionId: number) {
+        if (!this.signed) {
+            return;
+        }
+        return await this.signed.forceEndAuction(BigInt(auctionId));
+    }
+
     async createAuction(address: string, tokenId: number, price: number, endDate: Date) {
         if (!this.signed) {
             return;
         }
 
-        //TODO APPROVE NFT... ALSO APPROVALS ON ALL OTHER FUNCS
         const formatPrice = BigInt(Math.ceil(price * 10 ** 18));
         const end = Math.floor(endDate.getTime() / 1000); // epoch time
 
