@@ -4,7 +4,6 @@ import { Box, Button, Container, Grid, Switch, TextField } from "@mui/material";
 import Typography from "@mui/material/Typography";
 import Header from "../../components/Header";
 import { useLoginContext } from "@/contexts/LoginContextProvider";
-import { notFound, redirect } from "next/navigation";
 import { HouseServiceProvider } from "../../services/house";
 import { ethers } from "ethers";
 
@@ -21,7 +20,6 @@ export default function Management() {
   const [mgrInput, setMgrInput] = useState("");
   const [withdrawInput, setWithdrawInput] = useState(0);
   const [adminAddrInput, setAdmAddrInput] = useState("");
-  const [isLogin, setLog] = useState(true);
 
   const houseService = useMemo(
     () => new HouseServiceProvider(state.address, state.provider, state.signer),
@@ -29,7 +27,6 @@ export default function Management() {
   );
 
   useEffect(() => {
-
     if (state.isLoggedIn) {
       houseService
         .getContract()
@@ -38,6 +35,8 @@ export default function Management() {
           setAdminAddress(f);
           setIsAdmin(ethers.getAddress(f) == ethers.getAddress(state.address));
         });
+
+      houseService.getCollectedFees().then(f => setAdminBal(Number(f)));
 
       houseService.isManager().then((f) => setIsManager(f));
 
@@ -96,6 +95,7 @@ export default function Management() {
               variant="contained"
               sx={{ mt: 2 }}
               disabled={adminBalance == 0 || withdrawInput > adminBalance}
+              onClick={() => houseService.withdrawFees(withdrawInput)}
             >
               Withdraw to Admin
             </Button>

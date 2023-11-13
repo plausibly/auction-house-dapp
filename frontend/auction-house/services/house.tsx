@@ -1,4 +1,4 @@
-import { JsonRpcSigner, ethers } from "ethers";
+import { JsonRpcSigner, ethers, formatUnits } from "ethers";
 import AuctionHouse from "../../../contracts/artifacts/contracts/AuctionHouse.sol/AuctionHouse.json";
 
 /** Underlying type for an Auction Item in the smart contract */
@@ -39,12 +39,45 @@ export class HouseServiceProvider {
         return this.signed;
     }
 
-    async queryFilter(event: string) {
-        if (!this.contract) {
+    async getRecentAuctions(numAuctions: number) {
+        if (!this.signed) {
             return;
         }
 
-        return await this.contract.queryFilter(event);
+        const auctionEvents = await this.queryFilter("AuctionCreated");
+        if (!auctionEvents) {
+            return;
+        }
+
+        let auctionIds: Array<number> = [];
+        let nums = 0;
+
+        for (let i of auctionEvents) {
+            nums++;
+            const decoded = this.signed.interface.decodeEventLog("AuctionCreated", i.data, i.topics);
+            auctionIds.push(decoded[0]);
+            if (nums === numAuctions) {
+                break;
+            }
+        }
+
+        const auctionObjects: Array<AuctionItem> = [];
+        for (let i of auctionIds) {
+            const aucItem = await this.getAuctionObject(i);
+            if (aucItem) {
+                auctionObjects.push(aucItem);
+            }
+        }
+    
+        return auctionObjects;
+    }
+
+    async queryFilter(event: string) {
+        if (!this.signed) {
+            return;
+        }
+
+        return await this.signed.queryFilter(event);
     }
 
     async getAuctionObject(id: number) {
@@ -156,7 +189,7 @@ export class HouseServiceProvider {
         }
 
         const collected = await this.signed.collectedFees();
-        return BigInt(collected * BigInt(10) ** BigInt(18))
+        return formatUnits(collected, 18);
     }
 
     async withdrawFees(amnt: number) {

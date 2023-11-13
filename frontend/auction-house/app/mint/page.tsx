@@ -132,7 +132,6 @@ export default function Mint() {
         console.log("url: " + store.url);
       }
 
-      //TODO TEST THIS AGAIN
       const contractConnection = new ItemServiceProvider(
         contractAddress,
         state.address,

@@ -49,11 +49,16 @@ export default function Create() {
       const houseProvider = new HouseServiceProvider(state.address, state.provider, state.signer);
 
       // approve house to transfer nft
-      await itemProvider.approve(tokenId, await houseProvider.getContract().getAddress());
+      const tx = await itemProvider.approve(tokenId, await houseProvider.getContract().getAddress());
+      setBanner("Waiting for house to be approved to transfer NFT. Do not refresh this page");
+
+      await tx.wait();
+
+      setBanner("Creating auction...");
 
       await houseProvider.createAuction(addr, tokenId, price, date);
 
-      setBanner("Auction has been created");
+      setBanner("Auction request sent. The auction will show up once transaction has confirmed.");
 
 
     } catch (err) {

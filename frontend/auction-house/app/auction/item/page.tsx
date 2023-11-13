@@ -1,20 +1,22 @@
 "use client";
 import Header from "@/components/Header";
 import { Box, Button, Grid, Link, TextField, Typography } from "@mui/material";
-import FallbackImage from "../../../public/question_mark.png";
-import Image from "next/image";
+import FallbackImage from "@/public/question_mark.png";
 import { useEffect, useMemo, useState } from "react";
 import { AuctionItem, HouseServiceProvider } from "@/services/house";
 import { useLoginContext } from "@/contexts/LoginContextProvider";
 import { ethers } from "ethers";
 import { useSearchParams } from "next/navigation";
-import { notFound } from "next/navigation";
 import { ItemServiceProvider } from "@/services/item";
 import { CoinServiceProvider } from "@/services/coin";
 
 function normalizeBid(val: BigInt) {
   return Number(val) / 10 ** 18;
 }
+
+function delay(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+};
 
 export default function Item() {
   const itemId = useSearchParams().get("id");
@@ -62,8 +64,7 @@ export default function Item() {
       return;
     }
 
-    try {
-      const data = houseProvider.getAuctionObject(Number(itemId)).then((d) => {
+      houseProvider.getAuctionObject(Number(itemId)).then((d) => {
         if (d && ethers.isAddress(d.contractId)) {
           setItemData(d);
           setHasBidder(itemData.highestBidder !== zeroAddress);
@@ -87,11 +88,10 @@ export default function Item() {
             state.signer
           );
         }
-      });
+      }).catch(err => {
+        console.log(err);
+      })
 
-    } catch (err) {
-      console.log(err);
-    }
   }, [itemData, state, houseProvider, itemId]);
 
   const cancelAuction = async () => {
@@ -109,14 +109,13 @@ export default function Item() {
         setBanner("An error occurred. ");
       }
       console.error(err);
-      return;
     }
   }
 
   const endAuction = async () => {
     try {
       setBanner("Sending request to end auction...");
-      await houseProvider.cancelAuction(Number(itemId));
+      await houseProvider.endAuction(Number(itemId));
       setBanner("Request has been sent, pending confirmation.");
     } catch (err:any) {
       if (err.data) {
@@ -128,15 +127,14 @@ export default function Item() {
         setBanner("An error occurred. ");
       }
       console.error(err);
-      return;
     }
   }
 
   const claimItems = async () => {
     try {
       setBanner("Sending request to claim items...");
-      await houseProvider.cancelAuction(Number(itemId));
-      setBanner("Request has been sent. Transfers will complete after transaction is confirmed.");
+      await houseProvider.claimItems(Number(itemId));
+      setBanner("Request has been sent. Transfers will complete for the buyer/seller after transaction is confirmed.");
     } catch (err:any) {
       if (err.data) {
         const errDecode = houseProvider
@@ -147,7 +145,6 @@ export default function Item() {
         setBanner("An error occurred. ");
       }
       console.error(err);
-      return;
     }
   }
 
@@ -167,10 +164,14 @@ export default function Item() {
     setBanner("Processing bid... Please approve the house to transfer AUC.");
 
     try {
-      await coinProvider.approve(
+      const approve = await coinProvider.approve(
         bidAmt,
         await houseProvider.getContract().getAddress()
       );
+
+      setBanner("Waiting for approval. Do not refresh this page");
+
+      await approve.wait();
     } catch (err: any) {
       if (err.data) {
         const errDecode = coinProvider
@@ -184,7 +185,7 @@ export default function Item() {
       return;
     }
 
-    setBanner("Processing bid... please approve the transfer");
+    setBanner("Processing bid... please confirm the transfer");
 
     try {
       setBanner("Bid is processing..");
