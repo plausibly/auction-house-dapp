@@ -1,5 +1,5 @@
 import { JsonRpcSigner, ethers, formatUnits } from "ethers";
-import AuctionHouse from "@/../../contracts/artifacts/contracts/AuctionHouse.sol/AuctionHouse.json";
+import AuctionHouse from "@/artifacts/contracts/AuctionHouse.sol/AuctionHouse.json";
 
 /** Underlying type for an Auction Item in the smart contract */
 export interface AuctionItem {

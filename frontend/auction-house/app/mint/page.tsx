@@ -7,7 +7,7 @@ import { useLoginContext } from "@/contexts/LoginContextProvider";
 import { CoinServiceProvider } from "../../services/coin";
 import { NFTStorage, File } from "nft.storage";
 import { ContractFactory } from "ethers";
-import AuctionHouseItem from "../../../../contracts/artifacts/contracts/AuctionHouseItem.sol/AuctionHouseItem.json";
+import AuctionHouseItem from "@/artifacts/contracts/AuctionHouseItem.sol/AuctionHouseItem.json";
 import { ItemServiceProvider } from "@/services/item";
 
 interface NFTInput {
