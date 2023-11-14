@@ -371,7 +371,7 @@ export default function Item() {
             <></>
           )}
         </Grid>
-        <Grid item xs={12} sx={{ pt: 4, pl: 4, mb: 15 }}>
+        <Grid item xs={6} sx={{ pt: 4, pl: 4, mb: 15 }}>
           <Typography sx={{pb: 2}}>Sales fee (for seller): {currFee}%</Typography>
 
           <Typography sx={{ pb: 2 }}>Description: {desc}</Typography>

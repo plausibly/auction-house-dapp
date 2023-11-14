@@ -46,7 +46,7 @@ export default function Mint() {
     // clear inputs if items is decreased
     form.images = form.images.slice(0, numberItems);
     form.itemNames = form.itemNames.slice(0, numberItems);
-    form.itemDescs = form.itemNames.slice(0, numberItems);
+    form.itemDescs = form.itemDescs.slice(0, numberItems);
 
     // disable button if inputs are missing
     setIsDisabled(
