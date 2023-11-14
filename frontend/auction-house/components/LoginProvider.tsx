@@ -17,16 +17,16 @@ export default function LoginProvider() {
       if (state.isLoggedIn) {
         return;
       }
-  
+
       const { ethereum } = window;
-  
+
       if (!ethereum) {
         alert("No wallet extension detected!");
         return;
       }
       const provider = new ethers.BrowserProvider(ethereum);
       const accounts = await provider.send("eth_requestAccounts", []);
-  
+
       if (accounts.length > 0) {
         const signer = await provider.getSigner();
         setState({
@@ -36,16 +36,16 @@ export default function LoginProvider() {
           provider,
           isLoggedIn: true,
         });
-  
+
         localStorage.setItem("loggedIn", "true");
       }
-
     } catch (err) {}
-
   }, [state]);
 
   const logout = () => {
-    setState({} as LoginState);
+    setState({
+      isLoggedIn: false,
+    } as LoginState);
     localStorage.removeItem("loggedIn");
   };
 

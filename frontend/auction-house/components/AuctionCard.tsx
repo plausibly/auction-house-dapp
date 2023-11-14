@@ -25,6 +25,9 @@ export default function AuctionCard({ id = -1, itemData = {} as AuctionItem }) {
 
   // load metadata
   useEffect(() => {
+    if (!state.isLoggedIn) {
+      return;
+    }
     if (itemData && itemData.contractId.length > 0) {
       const itemProvider = new ItemServiceProvider(
         itemData.contractId,

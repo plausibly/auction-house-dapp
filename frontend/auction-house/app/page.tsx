@@ -4,12 +4,12 @@ import { Grid } from "@mui/material";
 
 import Typography from "@mui/material/Typography";
 import Header from "../components/Header";
-import LoginProvider from "@/components/LoginProvider";
 import { AuctionItem, HouseServiceProvider } from "@/services/house";
 import AuctionCard from "@/components/AuctionCard";
+import { useLoginContext } from "@/contexts/LoginContextProvider";
 
 export default function Home() {
-  const state = LoginProvider().state;
+  const state = useLoginContext().state;
 
   const [auctionCards, setAuctionCards] = useState<Array<any>>();
 
@@ -17,7 +17,6 @@ export default function Home() {
     () => new HouseServiceProvider(state.address, state.provider, state.signer),
     [state.address, state.provider, state.signer]
   );
-
 
   useEffect(() => {
     if (!state.isLoggedIn) {

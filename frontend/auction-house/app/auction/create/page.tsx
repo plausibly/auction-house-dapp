@@ -4,11 +4,11 @@ import { Button, Grid, TextField, Typography } from "@mui/material"
 import { useState } from "react";
 import { ethers } from "ethers";
 import { ItemServiceProvider } from "@/services/item";
-import LoginProvider from "@/components/LoginProvider";
 import { HouseServiceProvider } from "@/services/house";
+import { useLoginContext } from "@/contexts/LoginContextProvider";
 
 export default function Create() {
-  const state = LoginProvider().state;
+  const state = useLoginContext().state;
 
   const [banner, setBanner] = useState("");
   const [addr, setAddr] = useState("");
