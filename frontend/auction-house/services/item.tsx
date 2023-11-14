@@ -1,5 +1,5 @@
 import { JsonRpcSigner, ethers } from "ethers";
-import AuctionHouseItem from "../../../contracts/artifacts/contracts/AuctionHouseItem.sol/AuctionHouseItem.json";
+import AuctionHouseItem from "@/../../contracts/artifacts/contracts/AuctionHouseItem.sol/AuctionHouseItem.json";
 
 /**
  * Service class with functionality to communicate with an ERC-721 contract.
