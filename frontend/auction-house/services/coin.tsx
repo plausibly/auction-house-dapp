@@ -1,5 +1,5 @@
 import { JsonRpcSigner, ethers, formatUnits } from "ethers";
-import AuctionHouseCoin from "@/../../contracts/artifacts/contracts/AuctionHouseCoin.sol/AuctionHouseCoin.json";
+import AuctionHouseCoin from "@/artifacts/contracts/AuctionHouseItem.sol/AuctionHouseItem.json";
 
 
 export class CoinServiceProvider {
