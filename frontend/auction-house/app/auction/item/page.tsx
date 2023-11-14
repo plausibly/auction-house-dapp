@@ -37,6 +37,7 @@ export default function Item() {
   const [bidAmt, setBidAmt] = useState(0);
   const [isSeller, setIsSeller] = useState(false);
   const [loweredPrice, setLoweredPrice] = useState(0);
+  const [currFee, setFee] = useState("");
 
   const [name, setName] = useState("");
   const [desc, setDesc] = useState("");
@@ -115,10 +116,14 @@ export default function Item() {
           // Archived if: 1) item claimed, 2) auction force ended/cancel by seller
           setisArchived(itemData.archived);
         }
+
       })
       .catch((err) => {
         console.log(err);
       });
+
+      houseProvider.getFee().then(f => setFee(f.toString())).catch((err) => setFee(""));
+
   }, [itemData, state, houseProvider, itemId]);
 
   const cancelAuction = async () => {
@@ -335,26 +340,28 @@ export default function Item() {
                 sx={{ pt: 2 }}
                 style={{ display: "flex" }}
               >
-                <TextField
-                  id="standard-basic"
-                  label="New Price (AUC)"
-                  variant="filled"
-                  type="number"
-                  inputProps={{ min: 0 }}
-                  onChange={(e) => setLoweredPrice(Number(e.target.value))}
-                  sx={{ pr: 1 }}
-                />{" "}
                 {!hasBidder ? (
-                  <Button
-                    variant="contained"
-                    disabled={
-                      loweredPrice >= normalizeBid(itemData.highestBid) ||
-                      loweredPrice === 0
-                    }
-                    onClick={lowerPrice}
-                  >
-                    Lower
-                  </Button>
+                  <>
+                    <TextField
+                      id="standard-basic"
+                      label="New Price (AUC)"
+                      variant="filled"
+                      type="number"
+                      inputProps={{ min: 0 }}
+                      onChange={(e) => setLoweredPrice(Number(e.target.value))}
+                      sx={{ pr: 1 }}
+                    />
+                    <Button
+                      variant="contained"
+                      disabled={
+                        loweredPrice >= normalizeBid(itemData.highestBid) ||
+                        loweredPrice === 0
+                      }
+                      onClick={lowerPrice}
+                    >
+                      Lower
+                    </Button>
+                  </>
                 ) : (
                   <></>
                 )}
@@ -364,7 +371,9 @@ export default function Item() {
             <></>
           )}
         </Grid>
-        <Grid item xs={12} sx={{ pt: 4, pl: 4 }}>
+        <Grid item xs={12} sx={{ pt: 4, pl: 4, mb: 15 }}>
+          <Typography sx={{pb: 2}}>Sales fee (for seller): {currFee}%</Typography>
+
           <Typography sx={{ pb: 2 }}>Description: {desc}</Typography>
 
           <Typography sx={{ pb: 2 }}>Seller: {itemData.seller}</Typography>

@@ -5,9 +5,10 @@ URL (Could not use Netlify due to KYC requirement): https://auction-house-plausi
 
 // TODO CHANGE THIS IF REDEPLOYED
 Auction House: https://sepolia.etherscan.io/address/0x63D7245276Fb3162fbD2089B40CF6681721111ec
+
 Auction House Coin (AUC): https://sepolia.etherscan.io/address/0xD4Ab997ecf012387bCCA44D5fCC8bd49614B59B4
 
-TODO plan image
+![plan](./media/plan.png)
 
 
 # Auction House Dapp
