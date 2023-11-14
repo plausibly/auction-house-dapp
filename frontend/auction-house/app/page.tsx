@@ -11,30 +11,40 @@ import AuctionCard from "@/components/AuctionCard";
 export default function Home() {
   const state = LoginProvider().state;
 
-  const [auctionItems, setItemsList] = useState<Array<AuctionItem>>([]);
+  const [auctionCards, setAuctionCards] = useState<Array<any>>();
 
   const houseService = useMemo(
     () => new HouseServiceProvider(state.address, state.provider, state.signer),
     [state.address, state.provider, state.signer]
   );
 
+
   useEffect(() => {
-    houseService.getRecentAuctions(50).then((f) => {
-      if (f) {
-        setItemsList(f);
-      } else {
-        setItemsList([]);
+    if (!state.isLoggedIn) {
+      setAuctionCards([]);
+      return;
+    }
+
+    houseService.getRecentAuctions(50).then((auctionItems) => {
+      if (!auctionItems) {
+        setAuctionCards([]);
+        return;
       }
+
+      let cards = [];
+
+      for (let i = auctionItems.length - 1; i >= 0; i--) {
+        // flip loop to show most recent
+        cards.push(
+          <AuctionCard key={i} id={i} itemData={auctionItems[i]} />
+        );
+      }
+      setAuctionCards(cards);
+
     });
-  }, [houseService, auctionItems]);
 
-  let auctionCards = [];
+  }, [houseService, state, auctionCards]);
 
-  for (let i = 0; i < auctionItems.length; i++) {
-    auctionCards.push(
-      <AuctionCard key={i} id={i} itemData={auctionItems[i]} />
-    );
-  }
 
   return (
     <div>

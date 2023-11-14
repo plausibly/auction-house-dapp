@@ -58,7 +58,7 @@ export default function Create() {
 
       await houseProvider.createAuction(addr, tokenId, price, date);
 
-      setBanner("Auction request sent. The auction will show up once transaction has confirmed.");
+      setBanner("Auction request sent. The auction will show up on the home page once the transaction is confirmed.");
 
 
     } catch (err) {

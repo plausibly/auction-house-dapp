@@ -76,7 +76,7 @@ export class HouseServiceProvider {
         if (!this.signed) {
             return;
         }
-
+    //https://docs.ethers.org/v5/concepts/events/#events
         return await this.signed.queryFilter(event);
     }
 
@@ -197,6 +197,14 @@ export class HouseServiceProvider {
             return;
         }
 
-        await this.signed.withdrawFees(BigInt(amnt * 10 ** 18));
+        await this.signed.withdrawFees(Math.floor(amnt * 10 ** 18));
+    }
+
+    async lowerPrice(id: number, amnt: number) {
+        if (!this.signed) {
+            return;
+        }
+
+        await this.signed.lowerPrice(id, BigInt(Math.ceil(amnt * 10 ** 18)));
     }
 }

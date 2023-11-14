@@ -13,31 +13,35 @@ export default function LoginProvider() {
 
   // https://medium.com/@flavtech/how-to-easily-call-smart-contracts-using-ethers-nextjs-dd3dabd43c07
   const login = useCallback(async () => {
-    if (state.isLoggedIn) {
-      return;
-    }
+    try {
+      if (state.isLoggedIn) {
+        return;
+      }
+  
+      const { ethereum } = window;
+  
+      if (!ethereum) {
+        alert("No wallet extension detected!");
+        return;
+      }
+      const provider = new ethers.BrowserProvider(ethereum);
+      const accounts = await provider.send("eth_requestAccounts", []);
+  
+      if (accounts.length > 0) {
+        const signer = await provider.getSigner();
+        setState({
+          ...state,
+          address: accounts[0],
+          signer,
+          provider,
+          isLoggedIn: true,
+        });
+  
+        localStorage.setItem("loggedIn", "true");
+      }
 
-    const { ethereum } = window;
+    } catch (err) {}
 
-    if (!ethereum) {
-      alert("No wallet extension detected!");
-      return;
-    }
-    const provider = new ethers.BrowserProvider(ethereum);
-    const accounts = await provider.send("eth_requestAccounts", []);
-
-    if (accounts.length > 0) {
-      const signer = await provider.getSigner();
-      setState({
-        ...state,
-        address: accounts[0],
-        signer,
-        provider,
-        isLoggedIn: true,
-      });
-
-      localStorage.setItem("loggedIn", "true");
-    }
   }, [state]);
 
   const logout = () => {
@@ -46,7 +50,7 @@ export default function LoginProvider() {
   };
 
   useEffect(() => {
-    if (window == null) {
+    if (window == null || typeof window == undefined) {
       return;
     }
 
@@ -54,7 +58,6 @@ export default function LoginProvider() {
       login();
     }
   }, [login, state.isLoggedIn]);
-
 
   return {
     login,

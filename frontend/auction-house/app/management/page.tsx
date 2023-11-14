@@ -21,31 +21,115 @@ export default function Management() {
   const [withdrawInput, setWithdrawInput] = useState(0);
   const [adminAddrInput, setAdmAddrInput] = useState("");
 
+  const [banner, setBanner] = useState("");
+
   const houseService = useMemo(
     () => new HouseServiceProvider(state.address, state.provider, state.signer),
     [state.address, state.provider, state.signer]
   );
 
-  useEffect(() => {
-    if (state.isLoggedIn) {
-      houseService
+  const handleError = (err: any) => {
+    if (err.data) {
+      const errDecode = houseService
         .getContract()
-        .admin()
-        .then((f) => {
-          setAdminAddress(f);
-          setIsAdmin(ethers.getAddress(f) == ethers.getAddress(state.address));
-        });
+        .interface.parseError(err.data);
+      setBanner("An error occurred: " + errDecode?.args);
+    } else {
+      setBanner("An error occurred. ");
+    }
+  };
 
-      houseService.getCollectedFees().then(f => setAdminBal(Number(f)));
+  const withdrawReq = async () => {
+    setBanner("Requesting to withdraw. Please approve the transaction");
+    try {
+      await houseService.withdrawFees(withdrawInput);
+      setBanner(
+        "Request has been sent. Withdrawal will complete when tx is confirmed."
+      );
+    } catch (err: any) {
+      handleError(err);
+      console.error(err);
+    }
+  };
 
-      houseService.isManager().then((f) => setIsManager(f));
+  const removeMgr = async () => {
+    setBanner("Requesting to remove manager. Please approve the transaction");
+    try {
+      await houseService.removeManager(mgrInput);
+      setBanner("Request has been sent. Removal will when tx is confirmed.");
+    } catch (err: any) {
+      handleError(err);
+      console.error(err);
+    }
+  };
 
-      houseService.getFee().then((f) => setFeeText(f.toString()));
-    } 
+  const addMgr = async () => {
+    setBanner("Requesting to add manager. Please approve the transaction");
+    try {
+      await houseService.addManager(mgrInput);
+      setBanner(
+        "Request has been sent. Manager addition will complete when tx is confirmed."
+      );
+    } catch (err: any) {
+      handleError(err);
+      console.error(err);
+    }
+  };
+
+  const updateAdmin = async () => {
+    setBanner(
+      "Requesting to replace admin address. Please approve the transaction."
+    );
+    try {
+      await houseService.setAdmin(adminAddrInput);
+      setBanner(
+        "Request has been sent. Address will update once transaction has confirmed."
+      );
+    } catch (err: any) {
+      handleError(err);
+      console.error(err);
+    }
+  };
+
+  const setFee = async () => {
+    setBanner("Requesting to update fee. Please approve the transaction.");
+    try {
+      await houseService.setFee(feeInput);
+      setBanner(
+        "Request has been sent. Fee will update once transaction has confirmed."
+      );
+    } catch (err: any) {
+      handleError(err);
+      console.error(err);
+    }
+  };
+
+  useEffect(() => {
+    if (!state.isLoggedIn) {
+      return;
+    }
+    houseService
+      .getContract()
+      .admin()
+      .then((f) => {
+        setAdminAddress(f);
+        setIsAdmin(ethers.getAddress(f) == ethers.getAddress(state.address));
+      });
+
+    houseService.getCollectedFees().then((f) => setAdminBal(Number(f)));
+
+    houseService.isManager().then((f) => setIsManager(f));
+
+    houseService.getFee().then((f) => setFeeText(f.toString()));
   }, [state, houseService, isManager, currFee]);
 
   if (!isManager || !state.isLoggedIn) {
-    return <><Header /><Typography>Unauthorized </Typography></>;
+    return (
+      <>
+        <Header />
+        <Typography>Unauthorized </Typography>
+      </>
+    );
   }
 
   return (
@@ -56,15 +140,15 @@ export default function Management() {
           sx={{
             borderRadius: 8,
             border: 1,
-            marginTop: 8,
+            mt: 8,
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
+            mb: 20,
           }}
         >
           <Typography component="h1" variant="h5" sx={{ p: 1 }}>
-            {" "}
-            Management{" "}
+            Management
           </Typography>
 
           <Box
@@ -78,7 +162,9 @@ export default function Management() {
             <Typography variant="caption" sx={{ m: 1 }}>
               Admin: {adminAddress}
             </Typography>
-
+            <Typography color="red" sx={{ p: 2 }}>
+              {banner}
+            </Typography>
             <Typography>
               Uncollected House Balance: {adminBalance} AUC
             </Typography>
@@ -95,7 +181,7 @@ export default function Management() {
               variant="contained"
               sx={{ mt: 2 }}
               disabled={adminBalance == 0 || withdrawInput > adminBalance}
-              onClick={() => houseService.withdrawFees(withdrawInput)}
+              onClick={withdrawReq}
             >
               Withdraw to Admin
             </Button>
@@ -121,7 +207,7 @@ export default function Management() {
                   variant="contained"
                   sx={{ mt: 2, mb: 1 }}
                   disabled={!ethers.isAddress(adminAddrInput)}
-                  onClick={() => houseService.setAdmin(adminAddrInput)}
+                  onClick={updateAdmin}
                 >
                   Update
                 </Button>
@@ -138,7 +224,7 @@ export default function Management() {
                     variant="contained"
                     sx={{ mt: 1, mb: 2 }}
                     disabled={!ethers.isAddress(mgrInput)}
-                    onClick={() => houseService.addManager(mgrInput)}
+                    onClick={addMgr}
                   >
                     Add
                   </Button>
@@ -147,7 +233,7 @@ export default function Management() {
                     variant="contained"
                     sx={{ mt: 1, mb: 2, ml: 2 }}
                     disabled={!ethers.isAddress(mgrInput)}
-                    onClick={() => houseService.removeManager(mgrInput)}
+                    onClick={removeMgr}
                   >
                     Remove
                   </Button>
@@ -176,7 +262,7 @@ export default function Management() {
               onChange={(e) => setFeeInput(Number(e.target.value))}
             />
             <Button
-              onClick={() => houseService.setFee(feeInput)}
+              onClick={setFee}
               variant="contained"
               sx={{ mt: 2 }}
               disabled={feeInput < 0 || feeInput > 100}

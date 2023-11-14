@@ -9,14 +9,11 @@ import { ethers } from "ethers";
 import { useSearchParams } from "next/navigation";
 import { ItemServiceProvider } from "@/services/item";
 import { CoinServiceProvider } from "@/services/coin";
+import { getGatewayIpfs, ipfsFetch } from "@/utils/ipfshelper";
 
 function normalizeBid(val: BigInt) {
   return Number(val) / 10 ** 18;
 }
-
-function delay(ms: number) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-};
 
 export default function Item() {
   const itemId = useSearchParams().get("id");
@@ -39,7 +36,7 @@ export default function Item() {
   const [isArchived, setisArchived] = useState(false);
   const [bidAmt, setBidAmt] = useState(0);
   const [isSeller, setIsSeller] = useState(false);
-
+  const [loweredPrice, setLoweredPrice] = useState(0);
 
   const [name, setName] = useState("");
   const [desc, setDesc] = useState("");
@@ -59,12 +56,47 @@ export default function Item() {
     [state.address, state.provider, state.signer]
   );
 
+  const handleHouseError = (err: any) => {
+    if (err.data) {
+      const errDecode = houseProvider
+        .getContract()
+        .interface.parseError(err.data);
+      setBanner("An error occurred: " + errDecode?.args);
+    } else {
+      setBanner("An error occurred. ");
+    }
+  };
+
+  // load metadata
+  useEffect(() => {
+    if (itemData && itemData.contractId.length > 0) {
+      const itemProvider = new ItemServiceProvider(
+        itemData.contractId,
+        state.address,
+        state.provider,
+        state.signer
+      );
+
+      itemProvider.getMetadataUri(itemData.tokenId).then((f) => {
+        ipfsFetch(f).then((data) => {
+          if (data) {
+            setName(data.name);
+            setDesc(data.description);
+            setImgSrc(getGatewayIpfs(data.image));
+          }
+        });
+      });
+    }
+  }, [imgSrc, name, desc, state, itemData]);
+
   useEffect(() => {
     if (itemId == null || itemId == undefined) {
       return;
     }
 
-      houseProvider.getAuctionObject(Number(itemId)).then((d) => {
+    houseProvider
+      .getAuctionObject(Number(itemId))
+      .then((d) => {
         if (d && ethers.isAddress(d.contractId)) {
           setItemData(d);
           setHasBidder(itemData.highestBidder !== zeroAddress);
@@ -76,22 +108,17 @@ export default function Item() {
             );
           }
           // Mark as ended if date elapsed
-          setIsRunning(!itemData.archived && itemData.endTime.getTime() > Date.now());
+          setIsRunning(
+            !itemData.archived && itemData.endTime.getTime() > Date.now()
+          );
 
           // Archived if: 1) item claimed, 2) auction force ended/cancel by seller
           setisArchived(itemData.archived);
-
-          const itemProvider = new ItemServiceProvider(
-            d.contractId,
-            state.address,
-            state.provider,
-            state.signer
-          );
         }
-      }).catch(err => {
-        console.log(err);
       })
-
+      .catch((err) => {
+        console.log(err);
+      });
   }, [itemData, state, houseProvider, itemId]);
 
   const cancelAuction = async () => {
@@ -99,54 +126,48 @@ export default function Item() {
       setBanner("Sending cancellation request...");
       await houseProvider.cancelAuction(Number(itemId));
       setBanner("Cancellation request has been sent, pending confirmation.");
-    } catch (err:any) {
-      if (err.data) {
-        const errDecode = houseProvider
-          .getContract()
-          .interface.parseError(err.data);
-        setBanner("An error occurred: " + errDecode?.args);
-      } else {
-        setBanner("An error occurred. ");
-      }
+    } catch (err: any) {
+      handleHouseError(err);
       console.error(err);
     }
-  }
+  };
 
   const endAuction = async () => {
     try {
       setBanner("Sending request to end auction...");
       await houseProvider.endAuction(Number(itemId));
       setBanner("Request has been sent, pending confirmation.");
-    } catch (err:any) {
-      if (err.data) {
-        const errDecode = houseProvider
-          .getContract()
-          .interface.parseError(err.data);
-        setBanner("An error occurred: " + errDecode?.args);
-      } else {
-        setBanner("An error occurred. ");
-      }
+    } catch (err: any) {
+      handleHouseError(err);
       console.error(err);
     }
-  }
+  };
 
   const claimItems = async () => {
     try {
       setBanner("Sending request to claim items...");
       await houseProvider.claimItems(Number(itemId));
-      setBanner("Request has been sent. Transfers will complete for the buyer/seller after transaction is confirmed.");
-    } catch (err:any) {
-      if (err.data) {
-        const errDecode = houseProvider
-          .getContract()
-          .interface.parseError(err.data);
-        setBanner("An error occurred: " + errDecode?.args);
-      } else {
-        setBanner("An error occurred. ");
-      }
+      setBanner(
+        "Request has been sent. Transfers will complete for the buyer/seller after transaction is confirmed."
+      );
+    } catch (err: any) {
+      handleHouseError(err);
       console.error(err);
     }
-  }
+  };
+
+  const lowerPrice = async () => {
+    setBanner("Requesting to lower price. Please approve the transaction");
+    try {
+      const tx = await houseProvider.lowerPrice(Number(itemId), loweredPrice);
+      setBanner(
+        "Request has been sent. Price will be lowered once transaction is confirmed"
+      );
+    } catch (err: any) {
+      handleHouseError(err);
+      console.error(err);
+    }
+  };
 
   const handleBid = async () => {
     const highestBid = normalizeBid(itemData.highestBid);
@@ -190,17 +211,14 @@ export default function Item() {
     try {
       setBanner("Bid is processing..");
       await houseProvider.placeBid(Number(itemId), bidAmt);
+      setBanner(
+        "Bid sent. Auction will be updated upon transaction confirmation."
+      );
     } catch (err: any) {
-      if (err.data) {
-        const errDecode = houseProvider
-          .getContract()
-          .interface.parseError(err.data);
-        setBanner("An error occurred: " + errDecode?.args);
-      }
+      handleHouseError(err);
       console.error(err);
       return;
     }
-    setBanner("Bid sent. Auction will be updated upon transaction confirmation.");
   };
 
   if (
@@ -224,7 +242,7 @@ export default function Item() {
         <Grid item xs={12} md={4}>
           <Box
             component="img"
-            src={FallbackImage.src}
+            src={imgSrc}
             sx={{
               height: 500,
               width: 500,
@@ -273,12 +291,16 @@ export default function Item() {
           ) : (
             <>
               <Typography color="red" variant="h5" sx={{ pt: 2 }}>
-                Auction has ended. {" "}
+                Auction has ended.{" "}
                 {!isArchived && hasBidder ? "The bidder may claim items." : ""}
-                {isArchived ? "Items have been transferred to the rightful owner(s)." : ""}
+                {isArchived
+                  ? "Items have been transferred to the rightful owner(s)."
+                  : ""}
               </Typography>
               {!isArchived ? (
-                <Button variant="contained" onClick={claimItems}>Claim Items</Button>
+                <Button variant="contained" onClick={claimItems}>
+                  Claim Items
+                </Button>
               ) : (
                 <></>
               )}
@@ -291,7 +313,7 @@ export default function Item() {
               <Typography variant="h5">Seller Management:</Typography>
               <Typography variant="caption">
                 Cancelling the auction will not honor bids, items are refunded.
-                Ending the auction will sell to the current highest bidder. 
+                Ending the auction will sell to the current highest bidder.
               </Typography>
 
               <Box>
@@ -304,7 +326,38 @@ export default function Item() {
                 >
                   Cancel Auction
                 </Button>
-                <Button variant="contained" onClick={endAuction}>End Auction</Button>
+                <Button variant="contained" onClick={endAuction}>
+                  End Auction
+                </Button>
+              </Box>
+              <Box
+                alignItems="stretch"
+                sx={{ pt: 2 }}
+                style={{ display: "flex" }}
+              >
+                <TextField
+                  id="standard-basic"
+                  label="New Price (AUC)"
+                  variant="filled"
+                  type="number"
+                  inputProps={{ min: 0 }}
+                  onChange={(e) => setLoweredPrice(Number(e.target.value))}
+                  sx={{ pr: 1 }}
+                />{" "}
+                {!hasBidder ? (
+                  <Button
+                    variant="contained"
+                    disabled={
+                      loweredPrice >= normalizeBid(itemData.highestBid) ||
+                      loweredPrice === 0
+                    }
+                    onClick={lowerPrice}
+                  >
+                    Lower
+                  </Button>
+                ) : (
+                  <></>
+                )}
               </Box>
             </Box>
           ) : (
