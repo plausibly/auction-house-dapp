@@ -1,10 +1,9 @@
 "use client";
 import React, { useEffect, useMemo, useState } from "react";
 import { Grid } from "@mui/material";
-
 import Typography from "@mui/material/Typography";
 import Header from "../components/Header";
-import { AuctionItem, HouseServiceProvider } from "@/services/house";
+import { HouseServiceProvider } from "@/services/house";
 import AuctionCard from "@/components/AuctionCard";
 import { useLoginContext } from "@/contexts/LoginContextProvider";
 
@@ -34,16 +33,11 @@ export default function Home() {
 
       for (let i = auctionItems.length - 1; i >= 0; i--) {
         // flip loop to show most recent
-        cards.push(
-          <AuctionCard key={i} id={i} itemData={auctionItems[i]} />
-        );
+        cards.push(<AuctionCard key={i} id={i} itemData={auctionItems[i]} />);
       }
       setAuctionCards(cards);
-
     });
-
   }, [houseService, state, auctionCards]);
-
 
   return (
     <div>
@@ -67,7 +61,7 @@ export default function Home() {
         </Grid>
 
         {state.isLoggedIn ? (
-          <Grid item sx={{ m: 2, display: "flex" }} xs={12}>
+          <Grid container spacing={2}>
             {auctionCards}
           </Grid>
         ) : (

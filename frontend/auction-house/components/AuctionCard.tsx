@@ -2,7 +2,7 @@ import Card from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";
 import CardMedia from "@mui/material/CardMedia";
 import Typography from "@mui/material/Typography";
-import { CardActionArea, Link } from "@mui/material";
+import { CardActionArea, Grid, Link } from "@mui/material";
 import { AuctionItem } from "@/services/house";
 import { useEffect, useState } from "react";
 import FallbackImage from "@/public/question_mark.png";
@@ -48,7 +48,8 @@ export default function AuctionCard({ id = -1, itemData = {} as AuctionItem }) {
   }, [img, name, state, itemData]);
 
   return (
-    <Card sx={{ width: 350, m: 2 }}>
+    <Grid item lg={3} md={5} xs={12} sx={{p: 2}}>
+    <Card sx={{ width: 350, m: 3}}>
       <CardActionArea component={Link} href={itemLink}>
         <CardMedia
           component="img"
@@ -75,6 +76,7 @@ export default function AuctionCard({ id = -1, itemData = {} as AuctionItem }) {
           )}
         </CardContent>
       </CardActionArea>
-    </Card>
+    </Card>    
+    </Grid>
   );
 }

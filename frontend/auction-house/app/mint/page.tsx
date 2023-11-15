@@ -142,7 +142,7 @@ export default function Mint() {
 
       setBanner({
         color: "green",
-        msg: `Minted ${numberItems} items and deployed ERC-721 to address: ${contractAddress}`,
+        msg: `${numberItems} items will be minted on tx confirmation. ERC-721 deployed to address: ${contractAddress}`,
       });
     } catch (err) {
       setBanner({ color: "red", msg: "An error occurred" });
