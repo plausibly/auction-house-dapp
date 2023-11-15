@@ -244,7 +244,7 @@ export default function Item() {
     <div>
       <Header />
       <Grid container>
-        <Grid item xs={12} md={4}>
+        <Grid item xs={12} md={4} lg={5}>
           <Box
             component="img"
             src={imgSrc}
@@ -297,12 +297,12 @@ export default function Item() {
             <>
               <Typography color="red" variant="h5" sx={{ pt: 2 }}>
                 Auction has ended.{" "}
-                {!isArchived && hasBidder ? "The bidder may claim items." : ""}
+                {!isArchived && hasBidder ? "The bidder may claim items.": ""}
                 {isArchived
                   ? "Items have been transferred to the rightful owner(s)."
                   : ""}
               </Typography>
-              {!isArchived ? (
+              {!isArchived && hasBidder ? (
                 <Button variant="contained" onClick={claimItems}>
                   Claim Items
                 </Button>
@@ -320,10 +320,13 @@ export default function Item() {
                 Cancelling the auction will not honor bids, items are refunded.
                 Ending the auction will sell to the current highest bidder.
               </Typography>
-
+              <Typography color="red">
+              {
+                !hasBidder && !isRunning ? "Auction has ended with no bidders. You may cancel the auction to refund items." : ""
+              }
+              </Typography>
               <Box>
                 <Button
-                  disabled={!isRunning}
                   sx={{ m: 2 }}
                   color="error"
                   variant="contained"
@@ -331,7 +334,7 @@ export default function Item() {
                 >
                   Cancel Auction
                 </Button>
-                <Button variant="contained" onClick={endAuction}>
+                <Button variant="contained" disabled={!isRunning} onClick={endAuction}>
                   End Auction
                 </Button>
               </Box>
@@ -340,7 +343,7 @@ export default function Item() {
                 sx={{ pt: 2 }}
                 style={{ display: "flex" }}
               >
-                {!hasBidder ? (
+                {!hasBidder && isRunning ? (
                   <>
                     <TextField
                       id="standard-basic"
