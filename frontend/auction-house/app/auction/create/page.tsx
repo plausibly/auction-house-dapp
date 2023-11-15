@@ -114,7 +114,14 @@ export default function Create() {
         </Grid>
         <Grid item xs={12}>
           <Button variant="contained" disabled={addr.length === 0 || !date || !price} onClick={() => inputHandler()}>Create</Button>
-
+        </Grid>
+        <Grid item xs={5}>
+        <Typography color="white" variant="caption">(*) By clicking create you agree to the following terms and condition(s): </Typography>
+        <Typography variant="caption">{`The house ("smart contract", "dapp", "website", "administrator", "service") has full ownership of all assets ("AUC", "ERC-721", "NFT") exchanged
+        on this service. By "auctioning" an asset, you are requesting the house to advertise an item for you, and take bids for you. The house has no obligation
+        to honor any bids ("sales"). The house will provide the illusion of control over such assets, but the house is the underlying owner of any
+        assets transferred to it. The house has the right to change the associated smart contract address of this service at any time, and the house has the right to "exit scam", in which case all items will be taken by the "admin address".
+        Should the house decide to honor an auction, any "sales" are subject to fee(s) set by the house, these fees may change at any time and are not greater than 100%. `}</Typography>
         </Grid>
       </Grid>
     </div>
