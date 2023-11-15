@@ -187,6 +187,12 @@ export default function Item() {
       return;
     }
 
+    const bal = await coinProvider.getAUC()
+    if (Number(bal) < highestBid) {
+      setBanner("You do not have enough AUC for this bid");
+      return;
+    }
+
     setBanner("Processing bid... Please approve the house to transfer AUC.");
 
     try {

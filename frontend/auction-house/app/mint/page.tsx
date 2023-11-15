@@ -64,9 +64,10 @@ export default function Mint() {
   const [banner, setBanner] = useState({ color: "white", msg: "" });
 
   const mintHandler = async () => {
+    setBanner({color: "green", msg: "Minting AUC.."});
     try {
       await coinService.mintAUC(toMint);
-      setBanner({color:"white", msg:""});
+      setBanner({color:"green", msg:"AUC will be minted once tx is confirmed."});
     } catch (err) {
       setBanner({color: "red", msg: "Error occurred minting AUC"});
       console.error(err);
