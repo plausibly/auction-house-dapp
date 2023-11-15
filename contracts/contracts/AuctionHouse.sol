@@ -33,7 +33,7 @@ contract AuctionHouse {
         bool archived; // wheter the auction has ended and items are claimed
     }
 
-// todo add emits later
+    // Events
     event AuctionCreated(uint256 id);
     event AuctionCancelled(uint256 id);
     event AuctionEnded(uint256 id);

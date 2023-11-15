@@ -6,7 +6,7 @@ export interface AuctionItem {
     seller: string,
     contractId: string,
     tokenId: BigInt,
-    endTime: Date, // TODO convert *1000
+    endTime: Date,
     highestBid: BigInt,
     highestBidder: string,
     archived: boolean
@@ -76,7 +76,6 @@ export class HouseServiceProvider {
         if (!this.signed) {
             return;
         }
-    //https://docs.ethers.org/v5/concepts/events/#events
         return await this.signed.queryFilter(event);
     }
 
