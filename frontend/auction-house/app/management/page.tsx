@@ -40,6 +40,10 @@ export default function Management() {
   };
 
   const withdrawReq = async () => {
+    if (!isNaN(withdrawInput)) {
+      setBanner("Invalid withdrawal amount");
+      return;
+    }
     setBanner("Requesting to withdraw. Please approve the transaction");
     try {
       await houseService.withdrawFees(withdrawInput);
@@ -174,13 +178,13 @@ export default function Management() {
               variant="standard"
               type="number"
               sx={{ pl: 2 }}
-              inputProps={{ min: 0 }}
+              inputProps={{ min: 1 }}
               onChange={(e) => setWithdrawInput(Number(e.target.value))}
             />
             <Button
               variant="contained"
               sx={{ mt: 2 }}
-              disabled={adminBalance == 0 || withdrawInput > adminBalance}
+              disabled={adminBalance === 0 || withdrawInput <= 0 || withdrawInput > adminBalance}
               onClick={withdrawReq}
             >
               Withdraw to Admin

@@ -196,7 +196,7 @@ export class HouseServiceProvider {
             return;
         }
 
-        await this.signed.withdrawFees(Math.floor(amnt * 10 ** 18));
+        await this.signed.withdrawFees(BigInt(Math.floor(amnt * 10 ** 18)));
     }
 
     async lowerPrice(id: number, amnt: number) {
