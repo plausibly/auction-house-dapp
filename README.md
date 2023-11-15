@@ -7,6 +7,10 @@ Auction House: https://sepolia.etherscan.io/address/0x63D7245276Fb3162fbD2089B40
 
 Auction House Coin (AUC): https://sepolia.etherscan.io/address/0xD4Ab997ecf012387bCCA44D5fCC8bd49614B59B4
 
+# Contract Plan
+<details>
+<summary> Click to expand smart contract plan </summary>
+
 | Variables | |  |  
 | -------- | -------- | -------- |  
 | admin | address | The address for the house admin|  
@@ -59,6 +63,7 @@ Auction House Coin (AUC): https://sepolia.etherscan.io/address/0xD4Ab997ecf01238
 | FeeChanged | (fee: uint) | Indicates that the fee has changed for auction sales  |
 | PriceLowered | (id: uint256, newPrice: uint256) | Indicates the starting price has decreased by the seller for an item |
 
+</details>
 
 # Auction House Dapp
 
