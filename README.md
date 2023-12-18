@@ -1,12 +1,3 @@
-[![Review Assignment Due Date](https://classroom.github.com/assets/deadline-readme-button-24ddc0f5d75046c5622901739e7c5dd533143b0c8e959d652212380cedb1ea36.svg)](https://classroom.github.com/a/WOVDgdbS)
-
-# Submission Notes
-URL (Could not use Netlify due to KYC requirement): https://auction-house-plausibly.vercel.app/
-
-Auction House: https://sepolia.etherscan.io/address/0x63D7245276Fb3162fbD2089B40CF6681721111ec
-
-Auction House Coin (AUC): https://sepolia.etherscan.io/address/0xD4Ab997ecf012387bCCA44D5fCC8bd49614B59B4
-
 # Contract Plan
 <details>
 <summary> Click to expand smart contract plan </summary>
