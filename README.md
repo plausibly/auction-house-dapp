@@ -82,9 +82,3 @@ An admin can:
 ## Tech Stack 
 
 ![Contract](./media/tech.png)
-
-The fund manager (admin) can create new spending requests in benefit of the fund, such as paying for building new software or hiring new employees. The stakeholders can then vote on such proposals. If the minimum approval votes (75% of all tokens) have been met, the admin can execute the spending, which send the ETH to a given address.
-
-Here is the contract specification example:
-
-![Example](./media/example.png)
